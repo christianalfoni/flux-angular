@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+  <head></head>
+  <body ng-app="app">
+    <div ng-controller="CommentsController">
+      <form ng-submit="addComment()">
+        <input type="text" ng-model="title"/>
+      </form>
+      <ul>
+        <li ng-repeat="comment in comments">
+          {{comment.title}}
+        </li>
+      </ul>
+    </div>
+    <script src="angular.js"></script>
+    <script src="flux-angular.js"></script>
+    <script>
+        angular.module('app', ['flux'])
+          .factory('actions', function (flux) {
+
+            return flux.actions([
+              'addComment'
+            ]);
+
+          })
+          .factory('AppStore', function (flux, actions) {
+
+            return flux.store({
+              state: {
+                comments: []
+              },
+              actions: [
+                actions.addComment
+              ],
+              addComment: function (title) {
+                this.state.comments.push({title: title, created: Date.now() });
+                this.emitChange();
+              }
+            }); 
+
+          })
+          .controller('CommentsController', function ($scope, AppStore, actions) {
+            AppStore.bindTo($scope);
+
+            $scope.title = '';
+            $scope.addComment = function () {
+              actions.addComment($scope.title);
+              $scope.title = '';
+            }
+
+          })
+    </script>
+  </body>
+</html>
