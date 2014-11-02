@@ -13,6 +13,11 @@ angular.module('flux', [])
       function mergeStore (mixins, source, state) {
 
         var bindings = [];
+        var bindStateToScope = function (scope) {
+          Object.keys(state).forEach(function (key) {
+            scope[key] = safeDeepClone('[Circular]', [], state[key]);
+          });
+        };
 
         source.actions = source.actions || [];
 
@@ -46,11 +51,7 @@ angular.module('flux', [])
         }
 
         source.emitChange = function () {
-          bindings.forEach(function (obj) {
-            Object.keys(state).forEach(function (key) {
-              obj[key] = safeDeepClone('[Circular]', [], state[key]);
-            });
-          });
+          bindings.forEach(bindStateToScope);
           if (!$rootScope.$$phase) {
             $rootScope.$apply();
           }
@@ -79,6 +80,7 @@ angular.module('flux', [])
               bindings.splice(bindings.indexOf(scope), 1);
             }); 
             bindings.push(scope);
+            bindStateToScope(scope);
           }
         }
 

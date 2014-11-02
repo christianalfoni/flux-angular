@@ -4,7 +4,7 @@
   <body ng-app="app">
     <div ng-controller="CommentsController">
       <form ng-submit="addComment()">
-        <input type="text" ng-model="title"/>
+        <input type="text" ng-model="title" ng-disabled="test"/>
       </form>
       <ul>
         <li ng-repeat="comment in comments">
@@ -27,7 +27,8 @@
 
             return flux.store({
               state: {
-                comments: []
+                comments: [],
+                test: true
               },
               actions: [
                 actions.addComment
@@ -41,12 +42,15 @@
           })
           .controller('CommentsController', function ($scope, AppStore, actions) {
             AppStore.bindTo($scope);
-
+            console.log($scope);
             $scope.title = '';
             $scope.addComment = function () {
               actions.addComment($scope.title);
               $scope.title = '';
             }
+            setTimeout(function () {
+              actions.changeTest()
+            }, 1000);
 
           })
     </script>
