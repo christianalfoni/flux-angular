@@ -1,7 +1,8 @@
 flux-angular
 ==========
 
-An Angular JS flux expansion based on experiences building [www.jsfridge.com](http://www.jsfridge.com) and [www.jflux.io](http://www.jflux.io). Read more about FLUX over at [Facebook Flux](http://facebook.github.io/flux/). I wrote an article about it here: [My experiences building a FLUX application](http://christianalfoni.github.io/javascript/2014/10/27/my-experiences-building-a-flux-application.html)
+An Angular JS flux expansion based on experiences building [www.jsfridge.com](http://www.jsfridge.com) and [www.jflux.io](http://www.jflux.io). Read more about FLUX over at [Facebook Flux](http://facebook.github.io/flux/). I wrote an articles about it: [My experiences building a FLUX application](http://christianalfoni.github.io/javascript/2014/10/27/my-experiences-building-a-flux-application.html) and [Is it possible to use the FLUX architecture with Angular JS?]
+(http://www.christianalfoni.com/javascript/2014/09/25/using-flux-with-angular.html)
 
 - [What is it all about?](#whatisitallabout)
 - [How to install](#howtoinstall)
