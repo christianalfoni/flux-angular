@@ -12,6 +12,7 @@ An Angular JS flux expansion based on experiences building [www.jsfridge.com](ht
 		- [state](#state)
 		- [actions](#storeactions)
 		- [handlers](#handlers)
+		- [exports](#exports)
 		- [events](#events)
 		- [mixins](#mixins)
 		- [bindTo](#bindto)
@@ -104,6 +105,32 @@ angular.module('app', ['flux'])
 ```
 Based on the name of the action, add a handler that will run when the action is triggered. Any arguments passed to the action will be available in the handler.
 
+#### <a name="exports">exports</a>
+```javascript
+angular.module('app', ['flux'])
+	.factory('MyStore', function (flux, actions) {
+
+		return flux.store({
+			state: {
+				todos: []
+			},
+			actions: [
+				actions.addTodo
+			],
+			addTodo: function (title) {
+				this.state.todos.push({title: title, created: Date.now()});
+			},
+			exports: {
+				getTodos: function () {
+					return this.todos;
+				}
+			}
+		});
+
+	});
+```
+Exports are the GETTER methods used by your controllers to extract state from the store. The returned values are automatically deep cloned to keep the store immutable. The method context is bound to the state object, so return state values with: "this.todos", not "this.state.todos".
+
 #### <a name="events">events</a>
 ```javascript
 angular.module('app', ['flux'])
@@ -159,6 +186,11 @@ angular.module('app', ['flux'])
 			addTodo: function (title) {
 				this.state.todos.push({title: title, created: Date.now()});
 				this.emitChange();
+			},
+			exports: function () {
+				getTodos: function () {
+					return this.todos;
+				}
 			}
 		});
 
@@ -208,12 +240,21 @@ angular.module('app', ['flux'])
 			addTodo: function (title) {
 				this.state.todos.push({title: title});
 				this.emitChange();
-			}
+			},
+			exports: {
+				getTodos: function () {
+					return this.todos.filter(function (todo, index) {
+						return index < 5; // Just get the 5 first todos
+					});
+				}
+			}	
 		});
 	})
 	.controller('MyCtrl', function ($scope, MyStore, actions) {
 
-		MyStore.bindTo($scope);
+		MyStore.bindTo($scope, function () {
+			$scope.todos = MyStore.getTodos();
+		});
 
 		$scope.title = '';
 		$scope.addTodo = function () {
@@ -229,7 +270,7 @@ angular.module('app', ['flux'])
 		</ul>
 	</div>
 ```
-By binding a store to a $scope the state properties of the store will be available to the $scope and template.
+When binding a $scope to a store you use a callback to extract the state needed for that specific $scope. The callback will run whenever that store runs an **emitChange**. This gives a clear definition of what is on your $scope and it allows for grabbing a subset of state, f.ex. filtering.
 
 #### <a name="listener">listener</a>
 ```javascript
@@ -247,12 +288,17 @@ angular.module('app', ['flux'])
 				this.state.todos.push({title: title});
 				this.emitChange();
 				this.emit('todo:added');
+			},
+			exports: function () {
+				return this.todos;
 			}
 		});
 	})
 	.controller('MyCtrl', function ($scope, MyStore, actions) {
 
-		MyStore.bindTo($scope);
+		MyStore.bindTo($scope, function () {
+			$scope.todos = MyStore.getTodos();
+		});
 
 		$scope.title = '';
 		$scope.listClass = {'list': true, 'animation': false};

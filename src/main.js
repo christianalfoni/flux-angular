@@ -13,13 +13,9 @@ angular.module('flux', [])
       function mergeStore (mixins, source, state) {
 
         var bindings = [];
-        var bindStateToScope = function (scope) {
-          Object.keys(state).forEach(function (key) {
-            scope[key] = safeDeepClone('[Circular]', [], state[key]);
-          });
-        };
 
         source.actions = source.actions || [];
+        source.exports = source.exports || {};
 
         if (mixins && Array.isArray(mixins)) {
 
@@ -41,6 +37,11 @@ angular.module('flux', [])
                 case 'actions':
                   source.actions = source.actions.concat(mixin.actions);
                   break;
+                case 'exports':
+                  Object.keys(mixin.exports).forEach(function (key) {
+                    source.exports[key] = mixin.exports[key];
+                  });
+                  break;
                 default:
                   source[key] = mixin[key];
               }
@@ -51,7 +52,9 @@ angular.module('flux', [])
         }
 
         source.emitChange = function () {
-          bindings.forEach(bindStateToScope);
+          bindings.forEach(function (cb) {
+            cb();
+          });
           if (!$rootScope.$$phase) {
             $rootScope.$apply();
           }
@@ -72,17 +75,28 @@ angular.module('flux', [])
           action.on('trigger', source[action.handlerName].bind(source));
         });
 
-        source.state = state;
+        var exports = {};
 
-        return {
-          bindTo: function (scope) {
-            scope.$on('$destroy', function () {
-              bindings.splice(bindings.indexOf(scope), 1);
-            }); 
-            bindings.push(scope);
-            bindStateToScope(scope);
+        // Register exports
+        Object.keys(source.exports).forEach(function (key) {
+          exports[key] = function () {
+            return safeDeepClone('[Circular]', [], source.exports[key].apply(state, arguments));
+          };
+        });
+
+        source.state = state;
+        exports.bindTo = function (scope, cb) {
+          if (!scope || !cb) {
+            throw new Error('You have to pass a scope and a callback to: bindTo()');
           }
-        }
+          scope.$on('$destroy', function () {
+            bindings.splice(bindings.indexOf(cb), 1);
+          }); 
+          bindings.push(cb);
+          cb();
+        };
+
+        return exports;
 
       };
 

@@ -19,7 +19,8 @@
           .factory('actions', function (flux) {
 
             return flux.actions([
-              'addComment'
+              'addComment',
+              'changeTest'
             ]);
 
           })
@@ -31,18 +32,35 @@
                 test: true
               },
               actions: [
-                actions.addComment
+                actions.addComment,
+                actions.changeTest
               ],
               addComment: function (title) {
                 this.state.comments.push({title: title, created: Date.now() });
                 this.emitChange();
+              },
+              changeTest: function () {
+                this.state.test = !this.state.test;
+                this.emitChange();
+              },
+              exports: {
+                getComments: function () {
+                  return this.comments;
+                },
+                getTest: function () {
+                  return this.test;
+                }
               }
             }); 
 
           })
           .controller('CommentsController', function ($scope, AppStore, actions) {
-            AppStore.bindTo($scope);
-            console.log($scope);
+
+            AppStore.bindTo($scope, function () {
+              $scope.comments = AppStore.getComments();
+              $scope.test = AppStore.getTest();
+            });
+
             $scope.title = '';
             $scope.addComment = function () {
               actions.addComment($scope.title);
