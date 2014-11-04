@@ -19,6 +19,9 @@ var createActionFunction = function (actionName) {
     // Merge arguments array with "trigger", which is the
     // event that will be triggered, passing the original arguments
     // as arguments to the "trigger" event
+    if (!fn._events) {
+      throw new Error('You are triggering the action: ' + fn.handlerName + ', and nobody is listening to it yet. Remember to load up the store first');
+    }
     args = ['trigger'].concat(args);
     fn.emit.apply(fn, args);
 

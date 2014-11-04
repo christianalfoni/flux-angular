@@ -6,6 +6,7 @@ An Angular JS flux expansion based on experiences building [www.jsfridge.com](ht
 
 - [What is it all about?](#whatisitallabout)
 - [How to install](#howtoinstall)
+- [Changes](#changes)
 - [API](#api)
 	- [flux.actions()](#actions)
 	- [flux.store()](#store)
@@ -23,6 +24,10 @@ It can be difficult to get going with FLUX as there is no complete framework wit
 
 ## <a name="howtoinstall">How to install</a>
 Download from **releases/** folder of the repo, use `npm install flux-angular` or `bower install flux-angular`.
+
+## <a name="changes">Changes</a>
+v2.2.0
+	- Got rid of state object alltogether to keep a more consistent syntax. There really is no need for a special state object. If you want it, create it :-)
 
 ## <a name="api">API</a>
 
@@ -57,14 +62,12 @@ angular.module('app', ['flux'])
 	.factory('MyStore', function (flux) {
 
 		return flux.store({
-			state: {
-				todos: []
-			}
+			todos: []
 		});
 
 	});
 ```
-An object that holds the state of your store.
+Just add properties to your store.
 
 #### <a name="storeactions">actions</a>
 ```javascript
@@ -72,9 +75,7 @@ angular.module('app', ['flux'])
 	.factory('MyStore', function (flux, actions) {
 
 		return flux.store({
-			state: {
-				todos: []
-			},
+			todos: [],
 			actions: [
 				actions.addTodo
 			]
@@ -90,14 +91,12 @@ angular.module('app', ['flux'])
 	.factory('MyStore', function (flux, actions) {
 
 		return flux.store({
-			state: {
-				todos: []
-			},
+			todos: [],
 			actions: [
 				actions.addTodo
 			],
 			addTodo: function (title) {
-				this.state.todos.push({title: title, created: Date.now()});
+				this.todos.push({title: title, created: Date.now()});
 			}
 		});
 
@@ -111,14 +110,12 @@ angular.module('app', ['flux'])
 	.factory('MyStore', function (flux, actions) {
 
 		return flux.store({
-			state: {
-				todos: []
-			},
+			todos: [],
 			actions: [
 				actions.addTodo
 			],
 			addTodo: function (title) {
-				this.state.todos.push({title: title, created: Date.now()});
+				this.todos.push({title: title, created: Date.now()});
 			},
 			exports: {
 				getTodos: function () {
@@ -129,7 +126,7 @@ angular.module('app', ['flux'])
 
 	});
 ```
-Exports are the GETTER methods used by your controllers to extract state from the store. The returned values are automatically deep cloned to keep the store immutable. The method context is bound to the state object, so return state values with: "this.todos", not "this.state.todos".
+Exports are the GETTER methods used by your controllers to extract state from the store. The returned values are automatically deep cloned to keep the store immutable. The method context is bound to the store itself.
 
 #### <a name="events">events</a>
 ```javascript
@@ -137,14 +134,12 @@ angular.module('app', ['flux'])
 	.factory('MyStore', function (flux, actions) {
 
 		return flux.store({
-			state: {
-				todos: []
-			},
+			todos: [],
 			actions: [
 				actions.addTodo
 			],
 			addTodo: function (title) {
-				this.state.todos.push({title: title, created: Date.now()});
+				this.todos.push({title: title, created: Date.now()});
 				this.emitChange();
 				this.emit('added');
 			}
@@ -162,12 +157,11 @@ angular.module('app', ['flux'])
 	.factory('MyMixin', function (actions) {
 
 		return MyMixin = {
-			state: {},
 			actions: [
 				actions.removeTodo
 			],
 			removeTodo: function (index) {
-				this.state.todos.splice(index, 1);
+				this.todos.splice(index, 1);
 				this.emitChange();
 			}
 		};
@@ -177,14 +171,12 @@ angular.module('app', ['flux'])
 
 		return flux.store({
 			mixin: [MyMixin],
-			state: {
-				todos: []
-			},
+			todos: [],
 			actions: [
 				actions.addTodo
 			],
 			addTodo: function (title) {
-				this.state.todos.push({title: title, created: Date.now()});
+				this.todos.push({title: title, created: Date.now()});
 				this.emitChange();
 			},
 			exports: function () {
@@ -197,7 +189,7 @@ angular.module('app', ['flux'])
 	});
 
 ```
-Mixins helps you handle big stores. You do not want to divide your stores within one section of your application as they very quickly become dependant on each other. That can result in circular dependency problems. Use mixins instead and create big stores. **state**, **actions** and **handlers** will be merged with the main store.
+Mixins helps you handle big stores. You do not want to divide your stores within one section of your application as they very quickly become dependant on each other. That can result in circular dependency problems. Use mixins instead and create big stores. **mixins**, **actions** and **handlers** will be merged with the main store.
 
 **ProTip!** In big stores it is a good idea to create a StatesMixin that holds all possible state properties in your store. That makes it very easy to look up what states are available to you.
 
@@ -206,12 +198,10 @@ angular.module('app', ['flux'])
 	.factory('StateMixin', function () {
 
 		return {
-			state: {
-				someState: true,
-				stateA: 'foo',
-				stateB: 'bar',
-				stateC: []
-			}
+			someState: true,
+			stateA: 'foo',
+			stateB: 'bar',
+			stateC: []
 		};
 
 	})
@@ -233,12 +223,10 @@ angular.module('app', ['flux'])
 	})
 	.factory('MyStore', function (flux, actions) {
 		return flux.store({
-			state: {
-				todos: []
-			},
+			todos: [],
 			actions: [actions.addTodo],
 			addTodo: function (title) {
-				this.state.todos.push({title: title});
+				this.todos.push({title: title});
 				this.emitChange();
 			},
 			exports: {
@@ -280,12 +268,10 @@ angular.module('app', ['flux'])
 	})
 	.factory('MyStore', function (flux, actions) {
 		return flux.store({
-			state: {
-				todos: []
-			},
+			todos: [],
 			actions: [actions.addTodo],
 			addTodo: function (title) {
-				this.state.todos.push({title: title});
+				this.todos.push({title: title});
 				this.emitChange();
 				this.emit('todo:added');
 			},

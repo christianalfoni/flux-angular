@@ -10,7 +10,7 @@ angular.module('flux', [])
 
       var flux = {};
 
-      function mergeStore (mixins, source, state) {
+      function mergeStore (mixins, source) {
 
         var bindings = [];
 
@@ -19,20 +19,14 @@ angular.module('flux', [])
 
         if (mixins && Array.isArray(mixins)) {
 
-          // Merge mixins and state
+          // Merge mixins, state, handlers and exports
           mixins.forEach(function (mixin) {
             Object.keys(mixin).forEach(function (key) {
 
               switch(key) {
-                case 'state':
-                  var mixinState = mixin.state;
-                  Object.keys(mixinState).forEach(function (key) {
-                    state[key] = mixinState[key];
-                  });
-                  break;
                 case 'mixins':
                   // Return as actions and exports are handled on top traversal level
-                  return mergeStore(mixin.mixins, mixin, state);
+                  return mergeStore(mixin.mixins, mixin);
                   break;
                 case 'actions':
                   source.actions = source.actions.concat(mixin.actions);
@@ -43,6 +37,9 @@ angular.module('flux', [])
                   });
                   break;
                 default:
+                  if (source[key]) {
+                    throw new Error('The property: ' + key + ', already exists. Can not merge mixin with keys: ' + Object.keys(mixin).join(', '));
+                  }
                   source[key] = mixin[key];
               }
 
@@ -80,11 +77,10 @@ angular.module('flux', [])
         // Register exports
         Object.keys(source.exports).forEach(function (key) {
           exports[key] = function () {
-            return safeDeepClone('[Circular]', [], source.exports[key].apply(state, arguments));
+            return safeDeepClone('[Circular]', [], source.exports[key].apply(source, arguments));
           };
         });
 
-        source.state = state;
         exports.bindTo = function (scope, cb) {
           if (!scope || !cb) {
             throw new Error('You have to pass a scope and a callback to: bindTo()');
@@ -105,8 +101,11 @@ angular.module('flux', [])
       };
 
       flux.store = function (definition) {
-        var state = definition.state ? definition.state : {};
-        return mergeStore(definition.mixins, definition, state);
+        return mergeStore(definition.mixins, definition);
+      };
+
+      flux._init = function () {
+
       };
 
       return flux;

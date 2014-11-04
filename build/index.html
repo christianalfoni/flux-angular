@@ -24,23 +24,26 @@
             ]);
 
           })
-          .factory('AppStore', function (flux, actions) {
+          .factory('Mixin', function () {
+              return {
+                comments: []
+              };
+          })
+          .factory('AppStore', function (flux, actions, Mixin) {
 
             return flux.store({
-              state: {
-                comments: [],
-                test: true
-              },
+              mixins: [Mixin],
               actions: [
                 actions.addComment,
                 actions.changeTest
               ],
+              test: true,
               addComment: function (title) {
-                this.state.comments.push({title: title, created: Date.now() });
+                this.comments.push({title: title, created: Date.now() });
                 this.emitChange();
               },
               changeTest: function () {
-                this.state.test = !this.state.test;
+                this.test = !this.test;
                 this.emitChange();
               },
               exports: {
@@ -71,6 +74,9 @@
             }, 1000);
 
           })
+          .run(function (actions) {
+            //actions.addComment();
+          });
     </script>
   </body>
 </html>
