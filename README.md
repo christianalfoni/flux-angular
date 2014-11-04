@@ -272,8 +272,8 @@ angular.module('app', ['flux'])
 			actions: [actions.addTodo],
 			addTodo: function (title) {
 				this.todos.push({title: title});
-				this.emitChange();
 				this.emit('todo:added');
+				this.emitChange();
 			},
 			exports: function () {
 				return this.todos;
@@ -296,4 +296,4 @@ angular.module('app', ['flux'])
 		};
 	});
 ```
-Events emitted in a store will reach all active controllers in your application. Use them to trigger behaviour in controllers that are not realted to reflecting a state value in a template.
+Events emitted in a store will reach all active controllers in your application. Use them to trigger behaviour in controllers that are not realted to reflecting a state value in a template. Listeners does **NOT** trigger a digest loop so be sure to triggers these before running your **emitChange**.
