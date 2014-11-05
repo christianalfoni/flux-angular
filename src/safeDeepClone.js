@@ -11,12 +11,8 @@ function safeDeepClone(circularValue, refs, obj) {
     return copy;
   }
 
-  // Handle Array - or array-like items (Buffers)
+  // Handle Array - or array-like items
   if (obj instanceof Array || obj.length) {
-    //return Buffer as-is
-    if (typeof Buffer === "function" && typeof Buffer.isBuffer === "function" && Buffer.isBuffer(obj)) {
-      return new Buffer(obj);
-    }
     
     refs.push(obj);
     copy = [];
@@ -43,7 +39,7 @@ function safeDeepClone(circularValue, refs, obj) {
   }
 
   for (var attr in obj) {
-    if (obj.hasOwnProperty(attr)) {
+    if (obj.hasOwnProperty(attr) && attr !== '$$hashKey') {
       if (refs.indexOf(obj[attr]) >= 0) {
         copy[attr] = circularValue;
       } else {

@@ -7,6 +7,7 @@
  */
 
 var EventEmitter = require('./EventEmitter.js');
+var safeDeepClone = require('./safeDeepClone.js');
 
 var createActionFunction = function (actionName) {
 
@@ -14,7 +15,7 @@ var createActionFunction = function (actionName) {
   var fn = function () {
 
     // Grab all the arguments and convert to array
-    var args = Array.prototype.slice.call(arguments, 0);
+    var args = safeDeepClone('[Circular]', [], Array.prototype.slice.call(arguments, 0));
 
     // Merge arguments array with "trigger", which is the
     // event that will be triggered, passing the original arguments

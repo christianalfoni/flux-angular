@@ -18,9 +18,9 @@ var runBrowserifyTask = function (options) {
     debug: options.debug, // Need that sourcemapping
     standalone: 'flux-angular',
     // These options are just for Watchify
-    cache: {}, packageCache: {}, fullPaths: true
+    cache: {}, packageCache: {}, fullPaths: options.debug
   })
-    .require(require.resolve('./src/main.js'), { entry: true })
+    .require('./src/main.js', { entry: true })
     .external('angular');
 
   // The actual rebundle process

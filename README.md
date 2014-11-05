@@ -26,7 +26,12 @@ It can be difficult to get going with FLUX as there is no complete framework wit
 Download from **releases/** folder of the repo, use `npm install flux-angular` or `bower install flux-angular`.
 
 ## <a name="changes">Changes</a>
-v2.2.0
+v1.3.0
+	- Removed buffer dep, smaller file size
+	- Cloning data passed to actions also, to avoid mutation
+	- Removing Angular hashKeys passed to the store
+
+v1.2.0
 	- Got rid of state object alltogether to keep a more consistent syntax. There really is no need for a special state object. If you want it, create it :-)
 
 ## <a name="api">API</a>
