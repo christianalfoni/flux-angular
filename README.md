@@ -26,6 +26,9 @@ It can be difficult to get going with FLUX as there is no complete framework wit
 Download from **releases/** folder of the repo, use `npm install flux-angular` or `bower install flux-angular`.
 
 ## <a name="changes">Changes</a>
+v1.3.1
+	- Added ArrayBuffer, Blob and File as "non-clonable" objects
+
 v1.3.0
 	- Removed buffer dep, smaller file size
 	- Cloning data passed to actions also, to avoid mutation

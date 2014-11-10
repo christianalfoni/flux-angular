@@ -2,7 +2,7 @@ function safeDeepClone(circularValue, refs, obj) {
   var copy, tmp;
 
   // object is a false or empty value, or otherwise not an object
-  if (!obj || "object" !== typeof obj) return obj;
+  if (!obj || "object" !== typeof obj || obj instanceof ArrayBuffer || obj instanceof Blob || obj instanceof File) return obj;
 
   // Handle Date
   if (obj instanceof Date) {
