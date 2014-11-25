@@ -11,7 +11,7 @@
     "url": "https://github.com/christianalfoni/flux-angular.git"
   },
   "author": "Christian Alfoni",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
     "browserify": "^5.9.3",
     "chai": "^1.9.1",
