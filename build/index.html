@@ -1,82 +1,56 @@
 <!DOCTYPE html>
 <html>
-  <head></head>
-  <body ng-app="app">
-    <div ng-controller="CommentsController">
-      <form ng-submit="addComment()">
-        <input type="text" ng-model="title" ng-disabled="test"/>
-      </form>
-      <ul>
-        <li ng-repeat="comment in comments">
-          {{comment.title}}
-        </li>
-      </ul>
-    </div>
-    <script src="angular.js"></script>
-    <script src="flux-angular.js"></script>
-    <script>
-        angular.module('app', ['flux'])
-          .factory('actions', function (flux) {
+<head></head>
+<body ng-app="app">
+  <app/>
+  <script src="angular.js"></script>
+  <script src="flux-angular.js"></script>
+  <script>
+  angular.module('app', ['flux'])
 
-            return flux.actions([
-              'addComment',
-              'changeTest'
-            ]);
+  .actions('actions', [
+    'addComment'
+    ])
 
-          })
-          .factory('Mixin', function () {
-              return {
-                comments: []
-              };
-          })
-          .factory('AppStore', function (flux, actions, Mixin) {
+  .store('AppStore', function (flux, actions) {
 
-            return flux.store({
-              mixins: [Mixin],
-              actions: [
-                actions.addComment,
-                actions.changeTest
-              ],
-              test: true,
-              addComment: function (title) {
-                this.comments.push({title: title, created: Date.now() });
-                this.emitChange();
-              },
-              changeTest: function () {
-                this.test = !this.test;
-                this.emitChange();
-              },
-              exports: {
-                getComments: function () {
-                  return this.comments;
-                },
-                getTest: function () {
-                  return this.test;
-                }
-              }
-            }); 
+    return {
+      actions: [
+        actions.addComment
+      ],
+      comments: [],
+      addComment: function (title) {
+        this.comments.push({title: title, created: Date.now() });
+        this.emit('change');
+      },
+      exports: {
+        getComments: function () {
+          return this.comments;
+        }
+      }
+    }; 
 
-          })
-          .controller('CommentsController', function ($scope, AppStore, actions) {
+  })
 
-            AppStore.bindTo($scope, function () {
-              $scope.comments = AppStore.getComments();
-              $scope.test = AppStore.getTest();
-            });
+  .component('app', function (AppStore, actions) {
 
-            $scope.title = '';
-            $scope.addComment = function () {
-              actions.addComment($scope.title);
-              $scope.title = '';
-            }
-            setTimeout(function () {
-              actions.changeTest()
-            }, 1000);
+    return {
+      templateUrl: 'app.html',  
+      title: '',
+      comments: AppStore.getComments(),
+      init: function () {
+        this.$listenTo(AppStore, 'change', this.updateComments);
+      },
+      updateComments: function () {
+        this.comments = AppStore.getComments();
+      },
+      addComment: function () {
+        actions.addComment(this.title);
+        this.title = '';
+      }
+    };
 
-          })
-          .run(function (actions) {
-            //actions.addComment();
-          });
-    </script>
-  </body>
+  });
+  </script>
+</body>
 </html>
