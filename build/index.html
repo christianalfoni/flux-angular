@@ -1,72 +1,50 @@
 <!DOCTYPE html>
 <html>
-<head></head>
-<body ng-app="app">
-  <comments></comments>
-  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.27/angular.js"></script>
-  <script src="flux-angular.js"></script>
-  <script>
-  angular.module('app', ['flux'])
-  .factory('Mixin', function () {
-    return {
-      comments: []
-    };
-  })
-  .store('AppStore', function (flux, Mixin) {
-    return {
-      test: false,
-      comments: [],
-      handlers: {
-        addComment: function (title) {
-          this.comments.push({title: title, created: Date.now() });
-          this.emit("change");
+  <head>
+  </head>
+  <body ng-app="app">
+    <app/>
+    <script src="vendors.js"></script>
+    <script src="main.js"></script>
+    <script>
+    angular.module('app', ['flux'])
+    .store('AppStore', function () {
+      return {
+        comments: ['foo'],
+        handlers: {
+          'addComment': 'addComment'
         },
-        changeTest: function () {
-          this.test = !this.test;
-          this.emit("change");
+        addComment: function (comment) {
+          this.comments.push(comment);
+          this.emit('comments.add');
+        },
+        getComments: function () {
+          return this.comments;
+        }
+      };
+    })
+    .directive('app', function (AppStore, flux) {
+      return {
+        restrict: 'E',
+        scope: {},
+        template: '<form ng-submit="addComment()"><input type="text" ng-model="comment"/></form><ul><li ng-repeat="comment in comments">{{comment}}</li></ul>',
+        link: function (scope) {
+
+          scope.comment = '';
+          scope.comments = AppStore.getComments();
+
+          scope.addComment = function () {
+            flux.dispatch('addComment', scope.comment);
+            scope.comment = '';
+          };
+
+          scope.$listenTo(AppStore, 'comments.*', function () {
+            scope.comments = AppStore.getComments();
+          });
+
         }
       }
-    }
-  })
-  .directive('comments', function (AppStore, flux, $timeout, $http) {
-    return {
-      restrict: 'E',
-      templateUrl: 'app.html',
-      scope: {},
-      link: function (scope) {
-
-        scope.$listenTo(AppStore, 'change', function () {
-          scope.comments = AppStore.get('comments');
-          scope.test = AppStore.get('test');
-        });
-
-        scope.title = '';
-
-        var digests = 0;
-        scope.$watch(function () {
-          digests++;
-          console.log('digests: ' + digests);
-        });
-        scope.addComment = function () {
-/*   
-flux.dispatch('addComment', scope.title);
-
-                        $timeout(function () {
-flux.dispatch('addComment', scope.title);
-                        });
-                        */
-          $http.get('http://www.google.com')
-            .catch(function () {
-              console.log('hey');
-              flux.dispatch('addComment', scope.title);
-              scope.$apply();
-            });
-
-        };
-      }
-    };
-
-  })
-  </script>
-</body>
+    })
+    </script>
+  </body>
 </html>

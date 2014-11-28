@@ -1,76 +1,137 @@
 var gulp = require('gulp');
+var source = require('vinyl-source-stream'); // Used to stream bundle for further handling
 var browserify = require('browserify');
 var watchify = require('watchify');
-var source = require('vinyl-source-stream');
 var gulpif = require('gulp-if');
 var uglify = require('gulp-uglify');
 var streamify = require('gulp-streamify');
 var notify = require('gulp-notify');
+var concat = require('gulp-concat');
 var gutil = require('gulp-util');
-var package = require('./package.json');
 var shell = require('gulp-shell');
+var glob = require('glob');
+var jasminePhantomJs = require('gulp-jasmine2-phantomjs');
 
-// The task that handles both development and deployment
-var runBrowserifyTask = function (options) {
+// External dependencies you do not want to rebundle while developing,
+// but include in your application deployment
+var dependencies = [
+  'angular',
+  'dispatchr',
+  'util'
+];
 
-  // This bundle is for our application
-  var bundler = browserify({
-    debug: options.debug, // Need that sourcemapping
-    standalone: 'flux-angular',
-    // These options are just for Watchify
-    cache: {}, packageCache: {}, fullPaths: options.debug
-  })
-    .require('./src/main.js', { entry: true })
-    .external('angular');
-    /*
-    .external('dispatchr')
-    .external('dispatchr/utils/createStore')
-    .external('utils');
-*/
-  // The actual rebundle process
+var browserifyTask = function (options) {
+
+  // Our app bundler
+  var appBundler = browserify({
+    entries: [options.src], // Only need initial file, browserify finds the rest
+    debug: options.development, // Gives us sourcemapping
+    standalone: options.development ? null : 'flux',
+    cache: {}, packageCache: {}, fullPaths: true // Requirement of watchify
+  });
+
+  // We set our dependencies as externals on our app bundler when developing    
+  (options.development ? dependencies : ['angular']).forEach(function (dep) {
+    appBundler.external(dep);
+  });
+
+  // The rebundle process
   var rebundle = function () {
     var start = Date.now();
-    bundler.bundle()
+    console.log('Building APP bundle');
+    appBundler.bundle()
       .on('error', gutil.log)
-      .pipe(source(options.name))
-      .pipe(gulpif(options.uglify, streamify(uglify())))
+      .pipe(source('main.js'))
+      .pipe(gulpif(!options.development, streamify(uglify())))
       .pipe(gulp.dest(options.dest))
       .pipe(notify(function () {
-
-        // Fix for requirejs
-        var fs = require('fs');
-        var file = fs.readFileSync(options.dest + '/' + options.name).toString();
-        file = file.replace('define([],e)', 'define(["angular"],e)');
-        fs.writeFileSync(options.dest + '/' + options.name, file);
-
-        console.log('Built in ' + (Date.now() - start) + 'ms');
-
+        console.log('APP bundle built in ' + (Date.now() - start) + 'ms');
       }));
-
   };
 
   // Fire up Watchify when developing
-  if (options.watch) {
-    bundler = watchify(bundler);
-    bundler.on('update', rebundle);
+  if (options.development) {
+    appBundler = watchify(appBundler);
+    appBundler.on('update', rebundle);
   }
+      
+  rebundle();
 
-  return rebundle();
+  // We create a separate bundle for our dependencies as they
+  // should not rebundle on file changes. This only happens when
+  // we develop. When deploying the dependencies will be included 
+  // in the application bundle
+  if (options.development) {
 
+    var testFiles = glob.sync('./specs/**/*-spec.js');
+    var testBundler = browserify({
+      entries: testFiles,
+      debug: true, // Gives us sourcemapping
+      cache: {}, packageCache: {}, fullPaths: true // Requirement of watchify
+    });
+
+    dependencies.forEach(function (dep) {
+      testBundler.external(dep);
+    });
+
+    var rebundleTests = function () {
+      var start = Date.now();
+      console.log('Building TEST bundle');
+      testBundler.bundle()
+      .on('error', gutil.log)
+        .pipe(source('specs.js'))
+        .pipe(gulp.dest(options.dest))
+        .pipe(notify(function () {
+          console.log('TEST bundle built in ' + (Date.now() - start) + 'ms');
+        }));
+    };
+
+    testBundler = watchify(testBundler);
+    testBundler.on('update', rebundleTests);
+    rebundleTests();
+
+    var vendorsBundler = browserify({
+      debug: true,
+      require: dependencies
+    });
+    
+    // Run the vendor bundle
+    var start = new Date();
+    console.log('Building VENDORS bundle');
+    vendorsBundler.bundle()
+      .on('error', gutil.log)
+      .pipe(source('vendors.js'))
+      .pipe(gulpif(!options.development, streamify(uglify())))
+      .pipe(gulp.dest(options.dest))
+      .pipe(notify(function () {
+        console.log('VENDORS bundle built in ' + (Date.now() - start) + 'ms');
+      }));
+    
+  }
+  
 };
 
+// Starts our development workflow
 gulp.task('default', function () {
 
-  runBrowserifyTask({
-    watch: true,
-    dest: './build',
-    uglify: true,
-    debug: false,
-    name: 'flux-angular.js'
+  browserifyTask({
+    development: true,
+    src: './src/main.js',
+    dest: './build'
   });
 
 });
 
-gulp.task('test', shell.task([
-    './node_modules/.bin/jasmine-node ./specs --autotest --watch ./src --color'
-]));
+gulp.task('deploy', function () {
+
+  browserifyTask({
+    development: false,
+    src: './src/main.js',
+    dest: './dist'
+  });
+
+});
+
+gulp.task('test', function () {
+    return gulp.src('./build/testrunner-phantomjs.html').pipe(jasminePhantomJs());
+});

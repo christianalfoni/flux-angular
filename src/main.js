@@ -1,14 +1,17 @@
-var angular = global.angular || require('angular');
+// When requiring Angular it is added to global for some reason
+var angular = global.angular || require('angular') && global.angular;
+
 var safeDeepClone = require('./safeDeepClone.js');
 
 var Dispatchr = require('dispatchr')();
-var createStore = require('dispatchr/utils/createStore');
+var EventEmitter2 = require('eventemitter2').EventEmitter2;
 var util = require('util');
 
 var Flux = (function() {
-  function Flux() {
+
+  var Flux = function () {
     Dispatchr.apply(this, arguments);
-  }
+  };
 
   Object.keys(Dispatchr).forEach(function(key) {
     Flux[key] = Dispatchr[key];
@@ -16,33 +19,47 @@ var Flux = (function() {
 
   util.inherits(Flux, Dispatchr);
 
-  Flux.prototype.createStore = function(spec) {
+  Flux.prototype.createStore = function(name, spec) {
+
+    var state = {};
     spec = spec || {};
 
-    if(spec.state) {
-      spec.rehydrate = function(state) {
-        this.state = state;
-      };
+    /* Yahoo Dispatchr store interface */
+    function Store (dispatcher) {
+      this.dispatcher = dispatcher;
 
-      spec.dehydrate = function() {
-        return this.state;
-      };
+      EventEmitter2.call(this, {
+        wildcard: true
+      });
+
+      if (this.initialize) {
+        this.initialize();
+      }
+
     }
 
-    spec.get = function(key) {
-      return safeDeepClone('[Circular]', [], this[key]);
-    }
+    util.inherits(Store, EventEmitter2);
 
-    var store = createStore(spec);
+    Store.handlers = spec.handlers;
+    Store.storeName = name;
 
-    Flux.registerStore(store);
+    // Attach getters and state to the prototype
+    Object.keys(spec).forEach(function (key) {
+      if (typeof spec[key] === 'function' && (!spec.handlers || !spec.handlers[key] || typeof spec.handlers[key] === 'string')) {
+        Store.prototype[key] = function () {
+          return safeDeepClone('[Circular]', [], spec[key].apply(this, arguments));
+        };
+      } else if (typeof spec[key] !== 'function') {
+        Store.prototype[key] = spec[key];
+      }
+    });
 
-    return store;
-  }
+    Flux.registerStore(Store);
+
+  };
 
   return Flux;
 })();
-
 
 var moduleConstructor = angular.module;
 
@@ -52,10 +69,7 @@ angular.module = function() {
   moduleInstance.store = function(storeName, storeDefinition) {
     this.factory(storeName, ['$injector', 'flux', function($injector, flux) {
       var storeConfig = $injector.invoke(storeDefinition);
-      storeConfig.storeName = storeName;
-
-      var Store = flux.createStore(storeConfig);
-
+      flux.createStore(storeName, storeConfig);
       return flux.getStore(storeName);
     }]);
 
@@ -69,22 +83,19 @@ var app = angular.module('flux', [])
 .service('flux', Flux)
 .run(['$rootScope', '$timeout', function($rootScope, $timeout) {
 
-  var willRunDigest = false;
   $rootScope.constructor.prototype.$listenTo = function (store, eventName, callback) {
 
-    var scope = this;
     callback = callback.bind(this);
-    store.addListener(eventName, function() {
-      callback.apply(scope, arguments);
-      console.log('$rootScope.$$phase', $rootScope.$$phase);
-      if (!willRunDigest && !$rootScope.$$phase) {
-        willRunDigest = true;
-        $timeout(function () {console.log('runinng digest'); willRunDigest = false});
-      }
+
+    var scope = this;
+    var addMethod = eventName === '*' ? 'onAny' : 'on';
+    var removeMethod = eventName === '*' ? 'offAny' : 'off';
+    var args = eventName === '*' ? [callback] : [eventName, callback];
+
+    store[addMethod].apply(store, args);
+    this.$on('$destroy', function () {
+      store[removeMethod].apply(store, args);
     });
 
-    this.$on('$destroy', function () {
-      store.removeListener(eventName, callback);
-    });
   };
 }]);
