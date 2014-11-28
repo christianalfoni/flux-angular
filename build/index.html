@@ -2,55 +2,71 @@
 <html>
 <head></head>
 <body ng-app="app">
-  <app/>
-  <script src="angular.js"></script>
+  <comments></comments>
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.27/angular.js"></script>
   <script src="flux-angular.js"></script>
   <script>
   angular.module('app', ['flux'])
-
-  .actions('actions', [
-    'addComment'
-    ])
-
-  .store('AppStore', function (flux, actions) {
-
+  .factory('Mixin', function () {
     return {
-      actions: [
-        actions.addComment
-      ],
+      comments: []
+    };
+  })
+  .store('AppStore', function (flux, Mixin) {
+    return {
+      test: false,
       comments: [],
-      addComment: function (title) {
-        this.comments.push({title: title, created: Date.now() });
-        this.emit('change');
-      },
-      exports: {
-        getComments: function () {
-          return this.comments;
+      handlers: {
+        addComment: function (title) {
+          this.comments.push({title: title, created: Date.now() });
+          this.emit("change");
+        },
+        changeTest: function () {
+          this.test = !this.test;
+          this.emit("change");
         }
       }
-    }; 
-
+    }
   })
-
-  .component('app', function (AppStore, actions) {
-
+  .directive('comments', function (AppStore, flux, $timeout, $http) {
     return {
-      templateUrl: 'app.html',  
-      title: '',
-      comments: AppStore.getComments(),
-      init: function () {
-        this.$listenTo(AppStore, 'change', this.updateComments);
-      },
-      updateComments: function () {
-        this.comments = AppStore.getComments();
-      },
-      addComment: function () {
-        actions.addComment(this.title);
-        this.title = '';
+      restrict: 'E',
+      templateUrl: 'app.html',
+      scope: {},
+      link: function (scope) {
+
+        scope.$listenTo(AppStore, 'change', function () {
+          scope.comments = AppStore.get('comments');
+          scope.test = AppStore.get('test');
+        });
+
+        scope.title = '';
+
+        var digests = 0;
+        scope.$watch(function () {
+          digests++;
+          console.log('digests: ' + digests);
+        });
+        scope.addComment = function () {
+/*   
+flux.dispatch('addComment', scope.title);
+
+                        $timeout(function () {
+flux.dispatch('addComment', scope.title);
+                        });
+                        */
+          $http.get('http://www.google.com')
+            .catch(function () {
+              console.log('hey');
+              flux.dispatch('addComment', scope.title);
+              scope.$apply();
+            });
+
+        };
       }
     };
 
-  });
+  })
   </script>
 </body>
 </html>

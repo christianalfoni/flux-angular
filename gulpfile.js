@@ -22,7 +22,11 @@ var runBrowserifyTask = function (options) {
   })
     .require('./src/main.js', { entry: true })
     .external('angular');
-
+    /*
+    .external('dispatchr')
+    .external('dispatchr/utils/createStore')
+    .external('utils');
+*/
   // The actual rebundle process
   var rebundle = function () {
     var start = Date.now();
@@ -60,29 +64,9 @@ gulp.task('default', function () {
   runBrowserifyTask({
     watch: true,
     dest: './build',
-    uglify: false,
-    debug: true,
-    name: 'flux-angular.js'
-  });
-
-});
-
-gulp.task('deploy', function () {
-
-  runBrowserifyTask({
-    watch: false,
-    dest: './releases/' + package.version,
     uglify: true,
     debug: false,
-    name: 'flux-angular-' + package.version + '.min.js'
-  });
-
-  runBrowserifyTask({
-    watch: false,
-    dest: './releases/' + package.version,
-    uglify: false,
-    debug: false,
-    name: 'flux-angular-' + package.version + '.js'
+    name: 'flux-angular.js'
   });
 
 });
