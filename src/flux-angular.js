@@ -1,3 +1,5 @@
+'use strict';
+
 // When requiring Angular it is added to global for some reason
 var angular = global.angular || require('angular') && global.angular;
 
@@ -21,7 +23,6 @@ var Flux = (function() {
 
   Flux.prototype.createStore = function(name, spec) {
 
-    var state = {};
     spec = spec || {};
 
     /* Yahoo Dispatchr store interface */
@@ -79,7 +80,7 @@ angular.module = function() {
   return moduleInstance;
 };
 
-var app = angular.module('flux', [])
+angular.module('flux', [])
 .service('flux', Flux)
 .run(['$rootScope', '$timeout', function($rootScope, $timeout) {
 
@@ -87,7 +88,6 @@ var app = angular.module('flux', [])
 
     callback = callback.bind(this);
 
-    var scope = this;
     var addMethod = eventName === '*' ? 'onAny' : 'on';
     var removeMethod = eventName === '*' ? 'offAny' : 'off';
     var args = eventName === '*' ? [callback] : [eventName, callback];

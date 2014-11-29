@@ -3,14 +3,12 @@ var gulp = require('gulp');
 var source = require('vinyl-source-stream'); 
 var browserify = require('browserify');
 var watchify = require('watchify');
-var gulpif = require('gulp-if');
-var streamify = require('gulp-streamify');
 var notify = require('gulp-notify');
-var concat = require('gulp-concat');
 var gutil = require('gulp-util');
-var shell = require('gulp-shell');
-var glob = require('glob');
-var jasminePhantomJs = require('gulp-jasmine2-phantomjs');
+var jshint = require('gulp-jshint');
+var stylish = require('jshint-stylish');
+
+var scripts = ['./src/*.js', './gulpfile.js'];
 
 var browserifyTask = function (options) {
   // Our app bundler
@@ -47,16 +45,30 @@ var browserifyTask = function (options) {
 
 // Starts our development workflow
 gulp.task('default', function () {
+  gulp.run('lint', 'build', 'watch');
+});
 
+gulp.task('build', function () {
   browserifyTask({
     development: true,
     src: './src/flux-angular.js',
     dest: './build'
   });
+});
 
+gulp.task('lint', function () {
+  gulp.src(scripts)
+    .pipe(jshint())
+    .pipe(jshint.reporter(stylish));
+});
+
+gulp.task('watch', function() {
+  gulp.watch(scripts, ['lint']);
 });
 
 gulp.task('release', function () {
+
+  gulp.run('lint');
 
   browserifyTask({
     development: false,
