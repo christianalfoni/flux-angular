@@ -1,5 +1,6 @@
 var gulp = require('gulp');
-var source = require('vinyl-source-stream'); // Used to stream bundle for further handling
+// Used to stream bundle for further handling
+var source = require('vinyl-source-stream'); 
 var browserify = require('browserify');
 var watchify = require('watchify');
 var gulpif = require('gulp-if');
@@ -63,8 +64,4 @@ gulp.task('release', function () {
     dest: './release'
   });
 
-});
-
-gulp.task('test', function () {
-    return gulp.src('./build/testrunner-phantomjs.html').pipe(jasminePhantomJs());
 });
