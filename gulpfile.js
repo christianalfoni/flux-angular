@@ -40,7 +40,7 @@ var browserifyTask = function (options) {
     console.log('Building APP bundle');
     appBundler.bundle()
       .on('error', gutil.log)
-      .pipe(source('main.js'))
+      .pipe(source('flux-angular.js'))
       .pipe(gulp.dest(options.dest))
       .pipe(notify(function () {
         console.log('APP bundle built in ' + (Date.now() - start) + 'ms');
@@ -113,18 +113,18 @@ gulp.task('default', function () {
 
   browserifyTask({
     development: true,
-    src: './src/main.js',
+    src: './src/flux-angular.js',
     dest: './build'
   });
 
 });
 
-gulp.task('deploy', function () {
+gulp.task('release', function () {
 
   browserifyTask({
     development: false,
-    src: './src/main.js',
-    dest: './dist'
+    src: './src/flux-angular.js',
+    dest: './release'
   });
 
 });
