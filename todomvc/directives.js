@@ -32,7 +32,6 @@ angular.module('todomvc')
       scope.allChecked = TodoStore.isAllChecked();
       scope.statusFilter = TodoStore.getFilter();
       scope.editedTodo = null;
-      
     }
   };
 });
