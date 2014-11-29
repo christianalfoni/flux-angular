@@ -1,7 +1,7 @@
 {
   "name": "flux-angular",
   "version": "1.3.1",
-  "main": "src/main.js",
+  "main": "release/flux-angular.js",
   "dependencies": {
     "angular": "~1.2"
   }
