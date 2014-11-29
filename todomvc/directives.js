@@ -29,9 +29,13 @@ angular.module('todomvc')
     scope: {},
     templateUrl: 'templates/todoslist.html',
     link: function (scope) {
-      scope.allChecked = TodoStore.isAllChecked();
-      scope.statusFilter = TodoStore.getFilter();
       scope.editedTodo = null;
+
+      scope.$listenTo(TodoStore, 'todos.*', function() {
+        scope.todos = TodoStore.getTodos();
+        scope.allChecked = TodoStore.isAllChecked();
+        scope.statusFilter = TodoStore.getFilter();
+      });
     }
   };
 });

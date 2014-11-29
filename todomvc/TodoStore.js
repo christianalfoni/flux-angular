@@ -10,12 +10,10 @@ angular.module('todomvc')
         { completed: false } : (status === 'completed') ?
         { completed: true } : null;
     },
-
     handlers: {
       'addTodo': 'addTodo'
     },
     addTodo: function (todo) {
-
       if (!todo) {
         return;
       }
@@ -26,9 +24,7 @@ angular.module('todomvc')
       });
 
       this.emit('todos.add');
-
     },
-
     getTodos: function () {
       return this.todos;
     },
