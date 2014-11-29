@@ -11,16 +11,7 @@ var shell = require('gulp-shell');
 var glob = require('glob');
 var jasminePhantomJs = require('gulp-jasmine2-phantomjs');
 
-// External dependencies you do not want to rebundle while developing,
-// but include in your application deployment
-var dependencies = [
-  'angular',
-  'dispatchr',
-  'util'
-];
-
 var browserifyTask = function (options) {
-
   // Our app bundler
   var appBundler = browserify({
     entries: [options.src], // Only need initial file, browserify finds the rest
@@ -29,10 +20,7 @@ var browserifyTask = function (options) {
     cache: {}, packageCache: {}, fullPaths: true // Requirement of watchify
   });
 
-  // We set our dependencies as externals on our app bundler when developing    
-  (options.development ? dependencies : ['angular']).forEach(function (dep) {
-    appBundler.external(dep);
-  });
+  appBundler.external('angular');
 
   // The rebundle process
   var rebundle = function () {
@@ -54,31 +42,6 @@ var browserifyTask = function (options) {
   }
       
   rebundle();
-
-  // We create a separate bundle for our dependencies as they
-  // should not rebundle on file changes. This only happens when
-  // we develop. When deploying the dependencies will be included 
-  // in the application bundle
-  if (options.development) {
-
-    var vendorsBundler = browserify({
-      debug: true,
-      require: dependencies
-    });
-    
-    // Run the vendor bundle
-    var start = new Date();
-    console.log('Building VENDORS bundle');
-    vendorsBundler.bundle()
-      .on('error', gutil.log)
-      .pipe(source('vendors.js'))
-      .pipe(gulp.dest(options.dest))
-      .pipe(notify(function () {
-        console.log('VENDORS bundle built in ' + (Date.now() - start) + 'ms');
-      }));
-    
-  }
-  
 };
 
 // Starts our development workflow
