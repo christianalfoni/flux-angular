@@ -61,33 +61,6 @@ var browserifyTask = function (options) {
   // in the application bundle
   if (options.development) {
 
-    var testFiles = glob.sync('./specs/**/*-spec.js');
-    var testBundler = browserify({
-      entries: testFiles,
-      debug: true, // Gives us sourcemapping
-      cache: {}, packageCache: {}, fullPaths: true // Requirement of watchify
-    });
-
-    dependencies.forEach(function (dep) {
-      testBundler.external(dep);
-    });
-
-    var rebundleTests = function () {
-      var start = Date.now();
-      console.log('Building TEST bundle');
-      testBundler.bundle()
-      .on('error', gutil.log)
-        .pipe(source('specs.js'))
-        .pipe(gulp.dest(options.dest))
-        .pipe(notify(function () {
-          console.log('TEST bundle built in ' + (Date.now() - start) + 'ms');
-        }));
-    };
-
-    testBundler = watchify(testBundler);
-    testBundler.on('update', rebundleTests);
-    rebundleTests();
-
     var vendorsBundler = browserify({
       debug: true,
       require: dependencies
