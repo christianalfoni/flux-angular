@@ -4,8 +4,5 @@
   "main": "release/flux-angular.js",
   "dependencies": {
     "angular": "1.2 - 1.3"
-  },
-  "ignore": [
-    "todomvc"
-  ]
+  }
 }
