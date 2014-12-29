@@ -313,7 +313,7 @@ flux-angular is licensed under the [MIT license](LICENSE).
 
 > The MIT License (MIT)
 >
-> Copyright (c) 2014 Brandon Tilley
+> Copyright (c) 2014 Christian Alfoni
 >
 > Permission is hereby granted, free of charge, to any person obtaining a copy
 > of this software and associated documentation files (the "Software"), to deal
