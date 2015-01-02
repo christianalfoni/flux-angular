@@ -178,7 +178,7 @@ angular.module('app', ['flux'])
 	.factory('MyStore', function (flux, actions, MyMixin) {
 
 		return flux.store({
-			mixin: [MyMixin],
+			mixins: [MyMixin],
 			todos: [],
 			actions: [
 				actions.addTodo
@@ -216,7 +216,7 @@ angular.module('app', ['flux'])
 	.factory('MyStore', function (flux, StateMixin, OtherMixin, ThirdMixin) {
 
 		return flux.store({
-			mixin: [StateMixin, OtherMixin, ThirdMixin]
+			mixins: [StateMixin, OtherMixin, ThirdMixin]
 		});
 
 	});
