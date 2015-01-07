@@ -1,92 +1,80 @@
 var gulp = require('gulp');
+// Used to stream bundle for further handling
+var source = require('vinyl-source-stream'); 
 var browserify = require('browserify');
 var watchify = require('watchify');
-var source = require('vinyl-source-stream');
-var gulpif = require('gulp-if');
-var uglify = require('gulp-uglify');
-var streamify = require('gulp-streamify');
 var notify = require('gulp-notify');
 var gutil = require('gulp-util');
-var package = require('./package.json');
-var shell = require('gulp-shell');
+var jshint = require('gulp-jshint');
+var packageJson = require('./package.json');
+var stylish = require('jshint-stylish');
 
-// The task that handles both development and deployment
-var runBrowserifyTask = function (options) {
+var scripts = ['./src/*.js', './gulpfile.js'];
 
-  // This bundle is for our application
-  var bundler = browserify({
-    debug: options.debug, // Need that sourcemapping
-    standalone: 'flux-angular',
-    // These options are just for Watchify
-    cache: {}, packageCache: {}, fullPaths: options.debug
-  })
-    .require('./src/main.js', { entry: true })
-    .external('angular');
+var browserifyTask = function (options) {
+  // Our app bundler
+  var appBundler = browserify({
+    entries: [options.src], // Only need initial file, browserify finds the rest
+    debug: options.development, // Gives us sourcemapping
+    standalone: options.development ? null : 'flux',
+    cache: {}, packageCache: {}, fullPaths: options.development // Requirement of watchify
+  });
 
-  // The actual rebundle process
+  appBundler.external('angular');
+
+  // The rebundle process
   var rebundle = function () {
     var start = Date.now();
-    bundler.bundle()
+    console.log('Building APP bundle');
+    appBundler.bundle()
       .on('error', gutil.log)
-      .pipe(source(options.name))
-      .pipe(gulpif(options.uglify, streamify(uglify())))
+      .pipe(source('flux-angular-' + packageJson.version + '.js'))
       .pipe(gulp.dest(options.dest))
       .pipe(notify(function () {
-
-        // Fix for requirejs
-        var fs = require('fs');
-        var file = fs.readFileSync(options.dest + '/' + options.name).toString();
-        file = file.replace('define([],e)', 'define(["angular"],e)');
-        fs.writeFileSync(options.dest + '/' + options.name, file);
-
-        console.log('Built in ' + (Date.now() - start) + 'ms');
-
+        console.log('APP bundle built in ' + (Date.now() - start) + 'ms');
       }));
-
   };
 
   // Fire up Watchify when developing
-  if (options.watch) {
-    bundler = watchify(bundler);
-    bundler.on('update', rebundle);
+  if (options.development) {
+    appBundler = watchify(appBundler);
+    appBundler.on('update', rebundle);
   }
-
-  return rebundle();
-
+      
+  rebundle();
 };
 
+// Starts our development workflow
 gulp.task('default', function () {
+  gulp.run('lint', 'build', 'watch');
+});
 
-  runBrowserifyTask({
-    watch: true,
-    dest: './build',
-    uglify: false,
-    debug: true,
-    name: 'flux-angular.js'
+gulp.task('build', function () {
+  browserifyTask({
+    development: true,
+    src: './src/flux-angular.js',
+    dest: './build'
+  });
+});
+
+gulp.task('lint', function () {
+  gulp.src(scripts)
+    .pipe(jshint())
+    .pipe(jshint.reporter(stylish));
+});
+
+gulp.task('watch', function() {
+  gulp.watch(scripts, ['lint']);
+});
+
+gulp.task('release', function () {
+
+  gulp.run('lint');
+
+  browserifyTask({
+    development: false,
+    src: './src/flux-angular.js',
+    dest: './release'
   });
 
 });
-
-gulp.task('deploy', function () {
-
-  runBrowserifyTask({
-    watch: false,
-    dest: './releases/' + package.version,
-    uglify: true,
-    debug: false,
-    name: 'flux-angular-' + package.version + '.min.js'
-  });
-
-  runBrowserifyTask({
-    watch: false,
-    dest: './releases/' + package.version,
-    uglify: false,
-    debug: false,
-    name: 'flux-angular-' + package.version + '.js'
-  });
-
-});
-
-gulp.task('test', shell.task([
-    './node_modules/.bin/jasmine-node ./specs --autotest --watch ./src --color'
-]));

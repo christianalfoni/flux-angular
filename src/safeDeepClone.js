@@ -1,8 +1,11 @@
+/* global Blob */
+/* global File */
+
 function safeDeepClone(circularValue, refs, obj) {
-  var copy, tmp;
+  var copy;
 
   // object is a false or empty value, or otherwise not an object
-  if (!obj || "object" !== typeof obj || obj instanceof ArrayBuffer || obj instanceof Blob || obj instanceof File) return obj;
+  if (!obj || 'object' !== typeof obj || obj instanceof ArrayBuffer || obj instanceof Blob || obj instanceof File) return obj;
 
   // Handle Date
   if (obj instanceof Date) {

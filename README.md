@@ -1,310 +1,193 @@
 flux-angular
 ==========
 
-An Angular JS flux expansion based on experiences building [www.jsfridge.com](http://www.jsfridge.com) and [www.jflux.io](http://www.jflux.io). Read more about FLUX over at [Facebook Flux](http://facebook.github.io/flux/). I wrote an articles about it: [My experiences building a FLUX application](http://christianalfoni.github.io/javascript/2014/10/27/my-experiences-building-a-flux-application.html) and [Is it possible to use the FLUX architecture with Angular JS?]
-(http://www.christianalfoni.com/javascript/2014/09/25/using-flux-with-angular.html)
+## Welcome to version 2 of flux-angular
+There are some pretty big changes to the API in the new version. If you want to keep using the previous API, go to [flux-angular 1.x](FLUX-ANGULAR-1.md). I would like to give special thanks to @sheerun for all the discussions and code contributions.
 
-- [What is it all about?](#whatisitallabout)
-- [How to install](#howtoinstall)
-- [Changes](#changes)
-- [API](#api)
-	- [flux.actions()](#actions)
-	- [flux.store()](#store)
-		- [state](#state)
-		- [actions](#storeactions)
-		- [handlers](#handlers)
-		- [exports](#exports)
-		- [events](#events)
-		- [mixins](#mixins)
-		- [bindTo](#bindto)
-		- [listener](#listener)
+## Features
 
-## <a name="whatisitallabout">What is it all about?</a>
-It can be difficult to get going with FLUX as there is no complete framework with all the tools you need. This project will help you get going with the FLUX parts.
+- **Yahoo Dispatchr**
+- **EventEmitter2**
+- **Angular Store**
+- **Scope listenTo**
+- **Immutable**
 
-## <a name="howtoinstall">How to install</a>
-Download from **releases/** folder of the repo, use `npm install flux-angular` or `bower install flux-angular`.
+## Concept
+flux-angular 2 uses a more traditional flux pattern. It has the [Yahoo Dispatchr](https://github.com/yahoo/dispatchr) and [EventEmitter2](https://github.com/asyncly/EventEmitter2) for its event emitting. **Did you really monkeypatch Angular?**. Yes. Angular has a beautiful API (except directives ;-) ) and I did not want flux-angular to feel like an alien syntax invasion, but rather it being a natural part of the Angular habitat. Angular 1.x is a stable codebase and I would be very surprised if this monkeypatch would be affected in later versions.
 
-## <a name="changes">Changes</a>
-v1.3.1
-	- Added ArrayBuffer, Blob and File as "non-clonable" objects
-
-v1.3.0
-	- Removed buffer dep, smaller file size
-	- Cloning data passed to actions also, to avoid mutation
-	- Removing Angular hashKeys passed to the store
-
-v1.2.0
-	- Got rid of state object alltogether to keep a more consistent syntax. There really is no need for a special state object. If you want it, create it :-)
-
-## <a name="api">API</a>
-
-### <a name="actions">flux.actions()</a>
+## Create a store
 ```javascript
 angular.module('app', ['flux'])
-	.factory('actions', function (flux) {
+.store('MyStore', function () {
 
-		return flux.actions([
-			'addTodo',
-			'removeTodo'
-		]);
+  return {
 
-	});
+    // State
+    comments: [],
+
+    // Action handlers triggered by the dispatcher
+    handlers: {
+      'addComment': 'addComment'
+    },
+    addComment: function (comment) {
+      this.comments.push(comment);
+      this.emitChange();
+    },
+
+    // Getters
+    exports: {
+      getComments: function () {
+        return this.comments;
+      }
+    }
+
+  };
+
+});
 ```
-Use them inside controllers or other parts of your architecture. The only way to change the state of your application is through an action.
+A store in flux-angular works just like the **Yahoo Dispatchr**, it IS the Yahoo Dispatchr. The only difference is an extra property called **exports**. So **exports** and **handlers** are special properties. **handlers** is an object defining what dispatched actions to listen to and what method to run when that occurs. **exports** is an object defining methods to expose to controllers. The methods in the exports object is bound to the store. Any data returned by an export method is cloned. This keeps the store immutable. If you need to use an other export method inside an export method use **this.exports.myOtherExport()** to do so. That will not cause cloning. 
 
-### <a name="store">flux.store()</a>
-```javascript
+## Dispatching actions and grabbing state from store
+'''javascript
 angular.module('app', ['flux'])
-	.factory('MyStore', function (flux) {
+.controller('MyCtrl', function ($scope, MyStore, flux) {
+  
+  $scope.comments = [];
+  $scope.comment = '';
 
-		return flux.store();
+  $scope.addComment = function () {
+    flux.dispatch('addComment', $scope.comment);
+    $scope.comment = '';
+  };
 
-	});
+  // $listenTo to listen to stores
+  $scope.$listenTo(MyStore, function () {
+    $scope.comments = MyStore.getComments();
+  });
+
+});
 ```
-Creates a store.
+When a store runs the **emitChange** method any scopes listening to that store will trigger their callback, allowing them to update the $scope of the controller. You can also trigger specific events if you want to, with **emit('event')**.
 
-#### <a name="state">state</a>
-```javascript
-angular.module('app', ['flux'])
-	.factory('MyStore', function (flux) {
-
-		return flux.store({
-			todos: []
-		});
-
-	});
-```
-Just add properties to your store.
-
-#### <a name="storeactions">actions</a>
-```javascript
-angular.module('app', ['flux'])
-	.factory('MyStore', function (flux, actions) {
-
-		return flux.store({
-			todos: [],
-			actions: [
-				actions.addTodo
-			]
-		});
-
-	});
-```
-List what actions the store should handle. They will map to a handler with the same name.
-
-#### <a name="handlers">handler</a>
-```javascript
-angular.module('app', ['flux'])
-	.factory('MyStore', function (flux, actions) {
-
-		return flux.store({
-			todos: [],
-			actions: [
-				actions.addTodo
-			],
-			addTodo: function (title) {
-				this.todos.push({title: title, created: Date.now()});
-			}
-		});
-
-	});
-```
-Based on the name of the action, add a handler that will run when the action is triggered. Any arguments passed to the action will be available in the handler.
-
-#### <a name="exports">exports</a>
-```javascript
-angular.module('app', ['flux'])
-	.factory('MyStore', function (flux, actions) {
-
-		return flux.store({
-			todos: [],
-			actions: [
-				actions.addTodo
-			],
-			addTodo: function (title) {
-				this.todos.push({title: title, created: Date.now()});
-			},
-			exports: {
-				getTodos: function () {
-					return this.todos;
-				}
-			}
-		});
-
-	});
-```
-Exports are the GETTER methods used by your controllers to extract state from the store. The returned values are automatically deep cloned to keep the store immutable. The method context is bound to the store itself.
-
-#### <a name="events">events</a>
-```javascript
-angular.module('app', ['flux'])
-	.factory('MyStore', function (flux, actions) {
-
-		return flux.store({
-			todos: [],
-			actions: [
-				actions.addTodo
-			],
-			addTodo: function (title) {
-				this.todos.push({title: title, created: Date.now()});
-				this.emitChange();
-				this.emit('added');
-			}
-		});
-
-	});
-```
-Run **emitChange** to update all bound scopes about a change in the store. Run **emit** with a named event to notify controllers to trigger something. In this example, maybe you wanted to play an animation in a controller whenever a todo was added.
-
-**Note!** When **emitChange** is run all values on state will be cloned to bound scopes. Meaning that the state of a store is immutable. You can not do changes to a bound value on a scope and expect that to be valid inside your store also. You have to trigger an action to change the state of a store.
-
-#### <a name="mixins">mixins</a>
-```javascript
-angular.module('app', ['flux'])
-	.factory('MyMixin', function (actions) {
-
-		return MyMixin = {
-			actions: [
-				actions.removeTodo
-			],
-			removeTodo: function (index) {
-				this.todos.splice(index, 1);
-				this.emitChange();
-			}
-		};
-
-	})
-	.factory('MyStore', function (flux, actions, MyMixin) {
-
-		return flux.store({
-			mixins: [MyMixin],
-			todos: [],
-			actions: [
-				actions.addTodo
-			],
-			addTodo: function (title) {
-				this.todos.push({title: title, created: Date.now()});
-				this.emitChange();
-			},
-			exports: function () {
-				getTodos: function () {
-					return this.todos;
-				}
-			}
-		});
-
-	});
-
-```
-Mixins helps you handle big stores. You do not want to divide your stores within one section of your application as they very quickly become dependant on each other. That can result in circular dependency problems. Use mixins instead and create big stores. **mixins**, **actions** and **handlers** will be merged with the main store.
-
-**ProTip!** In big stores it is a good idea to create a StatesMixin that holds all possible state properties in your store. That makes it very easy to look up what states are available to you.
+### Event wildcards
+Due to Angulars dirtycheck you are given more control of how controllers and directives react to changes in the store. By using wildcards you can choose to listen to any event change in a store, within a specific state or a specific event. All the following listeners will trigger when MyStore runs **this.emit('comments.add')**:
 
 ```javascript
 angular.module('app', ['flux'])
-	.factory('StateMixin', function () {
+.controller('MyCtrl', function ($scope, MyStore, flux) {
 
-		return {
-			someState: true,
-			stateA: 'foo',
-			stateB: 'bar',
-			stateC: []
-		};
+  $scope.$listenTo(MyStore, 'comments.add', function () {
+    $scope.comments = MyStore.getComments();
+  });
 
-	})
-	.factory('MyStore', function (flux, StateMixin, OtherMixin, ThirdMixin) {
+  $scope.$listenTo(MyStore, 'comments.*', function () {
+    $scope.comments = MyStore.getComments();
+  });
 
-		return flux.store({
-			mixins: [StateMixin, OtherMixin, ThirdMixin]
-		});
+  $scope.$listenTo(MyStore, '*', function () {
+    $scope.comments = MyStore.getComments();
+  });
 
-	});
-
+});
 ```
 
-#### <a name="bindto">bindTo</a>
+## Wait for other stores to complete their handlers
 ```javascript
 angular.module('app', ['flux'])
-	.factory('actions', function (flux) {
-		return flux.actions(['addTodo']);
-	})
-	.factory('MyStore', function (flux, actions) {
-		return flux.store({
-			todos: [],
-			actions: [actions.addTodo],
-			addTodo: function (title) {
-				this.todos.push({title: title});
-				this.emitChange();
-			},
-			exports: {
-				getTodos: function () {
-					return this.todos.filter(function (todo, index) {
-						return index < 5; // Just get the 5 first todos
-					});
-				}
-			}	
-		});
-	})
-	.controller('MyCtrl', function ($scope, MyStore, actions) {
+.store('CommentsStore', function () {
+  
+  return {
+    comments: [],
+    handlers: {
+      'addComment': 'addComment'
+    },
+    addComment: function (comment) {
+      this.waitFor('NotificationStore', function () {
+        this.comments.push(comment);
+        this.emit('comments.add');
+      });
+    },
+    getComments: function () {
+      return this.comments;
+    }
+  };
 
-		MyStore.bindTo($scope, function () {
-			$scope.todos = MyStore.getTodos();
-		});
+})
+.store('NotificationStore', function () {
+  
+  return {
+    notifications: [],
+    handlers: {
+      'addComment': 'addNotification'
+    },
+    addNotification: function (comment) {
+      this.notifications.push('Something happened');
+      comment.hasNotified = true;
+    },
+    exports: {
+      getNotifications: function () {
+        return this.notifications;
+      }
+    }
+  };
 
-		$scope.title = '';
-		$scope.addTodo = function () {
-			actions.addTodo($scope.title);
-		};
-	});
+});
 ```
-```html
-	<div ng-controller="MyCtrl">
-		<input type="text" ng-model="title"/>
-		<ul>
-			<li ng-repeat="todo in todos">{{todo.title}}</li>
-		</ul>
-	</div>
-```
-When binding a $scope to a store you use a callback to extract the state needed for that specific $scope. The callback will run whenever that store runs an **emitChange**. This gives a clear definition of what is on your $scope and it allows for grabbing a subset of state, f.ex. filtering.
+The **waitFor** method allows you to let other stores handle the action before the current store acts upon it. You can also pass an array of stores. It was decided to run this method straight off the store, as it gives more sense and now the callback is bound to the store itself.
 
-#### <a name="listener">listener</a>
+### Get values from other stores
+If your application is structured in such a manner that you need to share state between stores you can create a shared state object:
+
 ```javascript
 angular.module('app', ['flux'])
-	.factory('actions', function (flux) {
-		return flux.actions(['addTodo']);
-	})
-	.factory('MyStore', function (flux, actions) {
-		return flux.store({
-			todos: [],
-			actions: [actions.addTodo],
-			addTodo: function (title) {
-				this.todos.push({title: title});
-				this.emit('todo:added');
-				this.emitChange();
-			},
-			exports: function () {
-				return this.todos;
-			}
-		});
-	})
-	.controller('MyCtrl', function ($scope, MyStore, actions) {
+.factory('AppState', function () {
+  return {
+    notifications: []
+  };
+})
+.store('CommentsStore', function (AppState) {
+  
+  return {
+    comments: [],
+    handlers: {
+      'addComment': 'addComment'
+    },
+    addComment: function (comment) {
+      this.waitFor('NotificationStore', function () {
+        comment.notificationId = AppState.notifications.length;
+        this.comments.push(comment);
+        this.emit('comments.add');
+      });
+    },
+    getComments: function () {
+      return this.comments;
+    }
+  };
 
-		MyStore.bindTo($scope, function () {
-			$scope.todos = MyStore.getTodos();
-		});
+})
+.store('NotificationStore', function (AppState) {
+  
+  return {
+    handlers: {
+      'addComment': 'addNotification'
+    },
+    addNotification: function (comment) {
+      AppState.notifications.push('Something happened');
+      comment.hasNotified = true;
+    },
+    exports: {
+      getNotifications: function () {
+        return this.notifications;
+      }
+    }
+  };
 
-		$scope.title = '';
-		$scope.listClass = {'list': true, 'animation': false};
-		$scope.$on('todo:added', function () {
-			$scope.listClass.animation = true;
-		});
-		$scope.addTodo = function () {
-			actions.addTodo($scope.title);
-		};
-	});
+});
 ```
-Events emitted in a store will reach all active controllers in your application. Use them to trigger behaviour in controllers that are not realted to reflecting a state value in a template. Listeners does **NOT** trigger a digest loop so be sure to triggers these before running your **emitChange**.
+If you first start to depend on stores directly you quickly get into circular dependency issues. You might consider putting all your state in a common AppState object that only the stores will inject.
+
+### Performance
+Any $scopes listening to stores are removed when the $scope is destroyed. When it comes to cloning it only happens when you pull data out from a store. So an array of 10.000 items in the store is not a problem, because your application would probably not want to show all 10.000 items at any time. In this scenario your getter method probably does a filter, or a limit before returning the data.
 
 License
 -------
@@ -332,4 +215,3 @@ flux-angular is licensed under the [MIT license](LICENSE).
 > LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 > THE SOFTWARE.
-
