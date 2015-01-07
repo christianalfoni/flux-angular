@@ -177,7 +177,7 @@ angular.module('app', ['flux'])
     },
     exports: {
       getNotifications: function () {
-        return this.notifications;
+        return AppState.notifications;
       }
     }
   };
