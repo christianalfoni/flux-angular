@@ -48,7 +48,7 @@ angular.module('app', ['flux'])
 A store in flux-angular works just like the **Yahoo Dispatchr**, it IS the Yahoo Dispatchr. The only difference is an extra property called **exports**. So **exports** and **handlers** are special properties. **handlers** is an object defining what dispatched actions to listen to and what method to run when that occurs. **exports** is an object defining methods to expose to controllers. The methods in the exports object is bound to the store. Any data returned by an export method is cloned. This keeps the store immutable. If you need to use an other export method inside an export method use **this.exports.myOtherExport()** to do so. That will not cause cloning. 
 
 ## Dispatching actions and grabbing state from store
-'''javascript
+```javascript
 angular.module('app', ['flux'])
 .controller('MyCtrl', function ($scope, MyStore, flux) {
   
