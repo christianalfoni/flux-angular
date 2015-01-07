@@ -8,6 +8,9 @@ var safeDeepClone = require('./safeDeepClone.js');
 var Dispatchr = require('dispatchr')();
 var EventEmitter2 = require('eventemitter2').EventEmitter2;
 var util = require('util');
+var storeExports = [];
+var stores = [];
+var storeNames = [];
 
 var Flux = (function() {
 
@@ -29,6 +32,11 @@ var Flux = (function() {
     function Store (dispatcher) {
       this.dispatcher = dispatcher;
 
+      // For conveniance, makes more sense
+      this.waitFor = function (store, cb) {
+          dispatcher.waitFor(store, cb.bind(this));
+      };
+
       EventEmitter2.call(this, {
         wildcard: true
       });
@@ -44,13 +52,15 @@ var Flux = (function() {
     Store.handlers = spec.handlers;
     Store.storeName = name;
 
+    Store.prototype.emitChange = function () {
+      this.emit('change');
+    };
+
+    Store.prototype.exports = {};
+
     // Attach getters and state to the prototype
     Object.keys(spec).forEach(function (key) {
-      if (typeof spec[key] === 'function' && (!spec.handlers || !spec.handlers[key] || typeof spec.handlers[key] === 'string')) {
-        Store.prototype[key] = function () {
-          return safeDeepClone('[Circular]', [], spec[key].apply(this, arguments));
-        };
-      } else if (typeof spec[key] !== 'function') {
+      if (key !== 'exports') {
         Store.prototype[key] = spec[key];
       }
     });
@@ -71,9 +81,28 @@ angular.module = function() {
     this.factory(storeName, ['$injector', 'flux', function($injector, flux) {
       var storeConfig = $injector.invoke(storeDefinition);
       flux.createStore(storeName, storeConfig);
-      return flux.getStore(storeName);
+
+      // Grab store and create exports object bound to the store
+      var store = flux.getStore(storeName);
+      var storeExport = {};
+      storeConfig.exports = storeConfig.exports || {};
+
+      // Keep reference for later lookup when listening to stores
+      stores.push(store);
+      storeExports.push(storeExport);
+
+      // Add cloning to returned state values
+      Object.keys(storeConfig.exports).forEach(function (key) {
+        storeExport[key] = function () {
+          return safeDeepClone('[Circular]', [], storeConfig.exports[key].apply(store, arguments));
+        };
+      });
+      return storeExport;
     }]);
 
+    // Add store names for pre-injection 
+    storeNames.push(storeName);
+    
     return this;
   };
 
@@ -82,12 +111,22 @@ angular.module = function() {
 
 angular.module('flux', [])
 .service('flux', Flux)
-.run(['$rootScope', '$timeout', function($rootScope, $timeout) {
+.run(['$rootScope', '$timeout', '$injector', function($rootScope, $timeout, $injector) {
 
-  $rootScope.constructor.prototype.$listenTo = function (store, eventName, callback) {
+  // Pre-inject all stores
+  $injector.invoke(storeNames.concat(function () {}));
+
+  // Extend scopes with $listenTo
+  $rootScope.constructor.prototype.$listenTo = function (storeExport, eventName, callback) {
+
+    if (!callback) {
+      callback = eventName;
+      eventName = '*';
+    }
 
     callback = callback.bind(this);
 
+    var store = stores[storeExports.indexOf(storeExport)];
     var addMethod = eventName === '*' ? 'onAny' : 'on';
     var removeMethod = eventName === '*' ? 'offAny' : 'off';
     var args = eventName === '*' ? [callback] : [eventName, callback];

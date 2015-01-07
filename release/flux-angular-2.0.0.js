@@ -1,5 +1,7 @@
-!function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.flux=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({"./src/flux-angular.js":[function(require,module,exports){
+!function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.flux=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 (function (global){
+'use strict';
+
 // When requiring Angular it is added to global for some reason
 var angular = global.angular || require('angular') && global.angular;
 
@@ -8,6 +10,9 @@ var safeDeepClone = require('./safeDeepClone.js');
 var Dispatchr = require('dispatchr')();
 var EventEmitter2 = require('eventemitter2').EventEmitter2;
 var util = require('util');
+var storeExports = [];
+var stores = [];
+var storeNames = [];
 
 var Flux = (function() {
 
@@ -23,12 +28,16 @@ var Flux = (function() {
 
   Flux.prototype.createStore = function(name, spec) {
 
-    var state = {};
     spec = spec || {};
 
     /* Yahoo Dispatchr store interface */
     function Store (dispatcher) {
       this.dispatcher = dispatcher;
+
+      // For conveniance, makes more sense
+      this.waitFor = function (store, cb) {
+          dispatcher.waitFor(store, cb.bind(this));
+      };
 
       EventEmitter2.call(this, {
         wildcard: true
@@ -45,13 +54,15 @@ var Flux = (function() {
     Store.handlers = spec.handlers;
     Store.storeName = name;
 
+    Store.prototype.emitChange = function () {
+      this.emit('change');
+    };
+
+    Store.prototype.exports = {};
+
     // Attach getters and state to the prototype
     Object.keys(spec).forEach(function (key) {
-      if (typeof spec[key] === 'function' && (!spec.handlers || !spec.handlers[key] || typeof spec.handlers[key] === 'string')) {
-        Store.prototype[key] = function () {
-          return safeDeepClone('[Circular]', [], spec[key].apply(this, arguments));
-        };
-      } else if (typeof spec[key] !== 'function') {
+      if (key !== 'exports') {
         Store.prototype[key] = spec[key];
       }
     });
@@ -72,24 +83,52 @@ angular.module = function() {
     this.factory(storeName, ['$injector', 'flux', function($injector, flux) {
       var storeConfig = $injector.invoke(storeDefinition);
       flux.createStore(storeName, storeConfig);
-      return flux.getStore(storeName);
+
+      // Grab store and create exports object bound to the store
+      var store = flux.getStore(storeName);
+      var storeExport = {};
+      storeConfig.exports = storeConfig.exports || {};
+
+      // Keep reference for later lookup when listening to stores
+      stores.push(store);
+      storeExports.push(storeExport);
+
+      // Add cloning to returned state values
+      Object.keys(storeConfig.exports).forEach(function (key) {
+        storeExport[key] = function () {
+          return safeDeepClone('[Circular]', [], storeConfig.exports[key].apply(store, arguments));
+        };
+      });
+      return storeExport;
     }]);
 
+    // Add store names for pre-injection 
+    storeNames.push(storeName);
+    
     return this;
   };
 
   return moduleInstance;
 };
 
-var app = angular.module('flux', [])
+angular.module('flux', [])
 .service('flux', Flux)
-.run(['$rootScope', '$timeout', function($rootScope, $timeout) {
+.run(['$rootScope', '$timeout', '$injector', function($rootScope, $timeout, $injector) {
 
-  $rootScope.constructor.prototype.$listenTo = function (store, eventName, callback) {
+  // Pre-inject all stores
+  $injector.invoke(storeNames.concat(function () {}));
+
+  // Extend scopes with $listenTo
+  $rootScope.constructor.prototype.$listenTo = function (storeExport, eventName, callback) {
+
+    if (!callback) {
+      callback = eventName;
+      eventName = '*';
+    }
 
     callback = callback.bind(this);
 
-    var scope = this;
+    var store = stores[storeExports.indexOf(storeExport)];
     var addMethod = eventName === '*' ? 'onAny' : 'on';
     var removeMethod = eventName === '*' ? 'offAny' : 'off';
     var args = eventName === '*' ? [callback] : [eventName, callback];
@@ -101,8 +140,9 @@ var app = angular.module('flux', [])
 
   };
 }]);
+
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./safeDeepClone.js":"/Users/sheerun/Source/flux-angular/src/safeDeepClone.js","angular":"angular","dispatchr":"/Users/sheerun/Source/flux-angular/node_modules/dispatchr/index.js","eventemitter2":"/Users/sheerun/Source/flux-angular/node_modules/eventemitter2/lib/eventemitter2.js","util":"/Users/sheerun/Source/flux-angular/node_modules/browserify/node_modules/util/util.js"}],"/Users/sheerun/Source/flux-angular/node_modules/browserify/node_modules/inherits/inherits_browser.js":[function(require,module,exports){
+},{"./safeDeepClone.js":13,"angular":"angular","dispatchr":6,"eventemitter2":12,"util":5}],2:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -127,7 +167,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],"/Users/sheerun/Source/flux-angular/node_modules/browserify/node_modules/process/browser.js":[function(require,module,exports){
+},{}],3:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -192,14 +232,14 @@ process.chdir = function (dir) {
     throw new Error('process.chdir is not supported');
 };
 
-},{}],"/Users/sheerun/Source/flux-angular/node_modules/browserify/node_modules/util/support/isBufferBrowser.js":[function(require,module,exports){
+},{}],4:[function(require,module,exports){
 module.exports = function isBuffer(arg) {
   return arg && typeof arg === 'object'
     && typeof arg.copy === 'function'
     && typeof arg.fill === 'function'
     && typeof arg.readUInt8 === 'function';
 }
-},{}],"/Users/sheerun/Source/flux-angular/node_modules/browserify/node_modules/util/util.js":[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -789,14 +829,14 @@ function hasOwnProperty(obj, prop) {
 }
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./support/isBuffer":"/Users/sheerun/Source/flux-angular/node_modules/browserify/node_modules/util/support/isBufferBrowser.js","_process":"/Users/sheerun/Source/flux-angular/node_modules/browserify/node_modules/process/browser.js","inherits":"/Users/sheerun/Source/flux-angular/node_modules/browserify/node_modules/inherits/inherits_browser.js"}],"/Users/sheerun/Source/flux-angular/node_modules/dispatchr/index.js":[function(require,module,exports){
+},{"./support/isBuffer":4,"_process":3,"inherits":2}],6:[function(require,module,exports){
 /**
  * Copyright 2014, Yahoo! Inc.
  * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
  */
 module.exports = require('./lib/Dispatcher');
 
-},{"./lib/Dispatcher":"/Users/sheerun/Source/flux-angular/node_modules/dispatchr/lib/Dispatcher.js"}],"/Users/sheerun/Source/flux-angular/node_modules/dispatchr/lib/Action.js":[function(require,module,exports){
+},{"./lib/Dispatcher":8}],7:[function(require,module,exports){
 /**
  * Copyright 2014, Yahoo! Inc.
  * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
@@ -895,7 +935,7 @@ Action.prototype.waitFor = function waitFor(stores, callback) {
 
 module.exports = Action;
 
-},{"debug":"/Users/sheerun/Source/flux-angular/node_modules/dispatchr/node_modules/debug/browser.js"}],"/Users/sheerun/Source/flux-angular/node_modules/dispatchr/lib/Dispatcher.js":[function(require,module,exports){
+},{"debug":9}],8:[function(require,module,exports){
 /**
  * Copyright 2014, Yahoo! Inc.
  * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
@@ -1046,7 +1086,7 @@ module.exports = function () {
      */
     Dispatcher.prototype.dispatch = function dispatch(actionName, payload) {
         if (this.currentAction) {
-            throw new Error('Cannot call dispatch while another dispatch is executing');
+            throw new Error('Cannot call dispatch while another dispatch is executing. Attempted to execute \'' + actionName + '\' but \'' + this.currentAction.name + '\' is already executing.');
         }
         var actionHandlers = Dispatcher.handlers[actionName] || [],
             defaultHandlers = Dispatcher.handlers[DEFAULT] || [];
@@ -1136,7 +1176,7 @@ module.exports = function () {
     return Dispatcher;
 };
 
-},{"./Action":"/Users/sheerun/Source/flux-angular/node_modules/dispatchr/lib/Action.js","debug":"/Users/sheerun/Source/flux-angular/node_modules/dispatchr/node_modules/debug/browser.js"}],"/Users/sheerun/Source/flux-angular/node_modules/dispatchr/node_modules/debug/browser.js":[function(require,module,exports){
+},{"./Action":7,"debug":9}],9:[function(require,module,exports){
 
 /**
  * This is the web browser implementation of `debug()`.
@@ -1285,7 +1325,7 @@ function load() {
 
 exports.enable(load());
 
-},{"./debug":"/Users/sheerun/Source/flux-angular/node_modules/dispatchr/node_modules/debug/debug.js"}],"/Users/sheerun/Source/flux-angular/node_modules/dispatchr/node_modules/debug/debug.js":[function(require,module,exports){
+},{"./debug":10}],10:[function(require,module,exports){
 
 /**
  * This is the common logic for both the Node.js and web browser
@@ -1484,7 +1524,7 @@ function coerce(val) {
   return val;
 }
 
-},{"ms":"/Users/sheerun/Source/flux-angular/node_modules/dispatchr/node_modules/debug/node_modules/ms/index.js"}],"/Users/sheerun/Source/flux-angular/node_modules/dispatchr/node_modules/debug/node_modules/ms/index.js":[function(require,module,exports){
+},{"ms":11}],11:[function(require,module,exports){
 /**
  * Helpers.
  */
@@ -1597,7 +1637,7 @@ function plural(ms, n, name) {
   return Math.ceil(ms / n) + ' ' + name + 's';
 }
 
-},{}],"/Users/sheerun/Source/flux-angular/node_modules/eventemitter2/lib/eventemitter2.js":[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 /*!
  * EventEmitter2
  * https://github.com/hij1nx/EventEmitter2
@@ -2172,12 +2212,15 @@ function plural(ms, n, name) {
   }
 }();
 
-},{}],"/Users/sheerun/Source/flux-angular/src/safeDeepClone.js":[function(require,module,exports){
+},{}],13:[function(require,module,exports){
+/* global Blob */
+/* global File */
+
 function safeDeepClone(circularValue, refs, obj) {
-  var copy, tmp;
+  var copy;
 
   // object is a false or empty value, or otherwise not an object
-  if (!obj || "object" !== typeof obj || obj instanceof ArrayBuffer || obj instanceof Blob || obj instanceof File) return obj;
+  if (!obj || 'object' !== typeof obj || obj instanceof ArrayBuffer || obj instanceof Blob || obj instanceof File) return obj;
 
   // Handle Date
   if (obj instanceof Date) {
@@ -2227,5 +2270,6 @@ function safeDeepClone(circularValue, refs, obj) {
 }
 
 module.exports = safeDeepClone;
-},{}]},{},["./src/flux-angular.js"])("./src/flux-angular.js")
+
+},{}]},{},[1])(1)
 });

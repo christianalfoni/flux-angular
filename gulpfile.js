@@ -6,6 +6,7 @@ var watchify = require('watchify');
 var notify = require('gulp-notify');
 var gutil = require('gulp-util');
 var jshint = require('gulp-jshint');
+var packageJson = require('./package.json');
 var stylish = require('jshint-stylish');
 
 var scripts = ['./src/*.js', './gulpfile.js'];
@@ -16,7 +17,7 @@ var browserifyTask = function (options) {
     entries: [options.src], // Only need initial file, browserify finds the rest
     debug: options.development, // Gives us sourcemapping
     standalone: options.development ? null : 'flux',
-    cache: {}, packageCache: {}, fullPaths: true // Requirement of watchify
+    cache: {}, packageCache: {}, fullPaths: options.development // Requirement of watchify
   });
 
   appBundler.external('angular');
@@ -27,7 +28,7 @@ var browserifyTask = function (options) {
     console.log('Building APP bundle');
     appBundler.bundle()
       .on('error', gutil.log)
-      .pipe(source('flux-angular.js'))
+      .pipe(source('flux-angular-' + packageJson.version + '.js'))
       .pipe(gulp.dest(options.dest))
       .pipe(notify(function () {
         console.log('APP bundle built in ' + (Date.now() - start) + 'ms');
