@@ -189,6 +189,7 @@ If you first start to depend on stores directly you quickly get into circular de
 ### Performance
 Any $scopes listening to stores are removed when the $scope is destroyed. When it comes to cloning it only happens when you pull data out from a store. So an array of 10.000 items in the store is not a problem, because your application would probably not want to show all 10.000 items at any time. In this scenario your getter method probably does a filter, or a limit before returning the data.
 
+
 License
 -------
 
