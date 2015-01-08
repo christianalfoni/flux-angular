@@ -59,7 +59,8 @@ angular.module('app', ['flux'])
     $scope.comment = '';
   };
 
-  // $listenTo to listen to stores
+  // $listenTo to listen to changes in store. Callback
+  // runs on registration to update the $scope
   $scope.$listenTo(MyStore, function () {
     $scope.comments = MyStore.getComments();
   });
