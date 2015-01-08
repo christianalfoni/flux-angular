@@ -52,7 +52,6 @@ A store in flux-angular works just like the **Yahoo Dispatchr**, it IS the Yahoo
 angular.module('app', ['flux'])
 .controller('MyCtrl', function ($scope, MyStore, flux) {
   
-  $scope.comments = [];
   $scope.comment = '';
 
   $scope.addComment = function () {
