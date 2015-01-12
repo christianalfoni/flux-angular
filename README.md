@@ -12,6 +12,10 @@ There are some pretty big changes to the API in the new version. If you want to 
 - **Scope listenTo**
 - **Immutable**
 
+## Changes
+**2.0.1**:
+  - Added automatic reset of stores during testing
+
 ## Concept
 flux-angular 2 uses a more traditional flux pattern. It has the [Yahoo Dispatchr](https://github.com/yahoo/dispatchr) and [EventEmitter2](https://github.com/asyncly/EventEmitter2) for its event emitting. **Did you really monkeypatch Angular?**. Yes. Angular has a beautiful API (except directives ;-) ) and I did not want flux-angular to feel like an alien syntax invasion, but rather it being a natural part of the Angular habitat. Angular 1.x is a stable codebase and I would be very surprised if this monkeypatch would be affected in later versions.
 
@@ -151,7 +155,7 @@ angular.module('app', ['flux'])
 ```
 
 ### Async operations
-It is not recommended to run async operations in your stor handlers. The reason is that you would have a harder time testing. A dispatched messages could result in an async operation. But also the **waitFor** method requires the handlers to be synchronous. So they way you solve this is having async services.
+It is not recommended to run async operations in your store handlers. The reason is that you would have a harder time testing and. The **waitFor** method also requires the handlers to be synchronous. So they way you solve this is having async services.
 
 ```javascript
 angular.module('app', ['flux'])
@@ -172,6 +176,11 @@ angular.module('app', ['flux'])
         flux.dispatch(actions.COMMENT_ADD_ERROR, comment, error);
       });
     }
+  };
+})
+.controller('MyCtrl', function (Backend) {
+  $scope.addComment = function () {
+    Backend.addComment({content: 'foo'});
   };
 });
 ```
@@ -226,6 +235,28 @@ angular.module('app', ['flux'])
 });
 ```
 If you first start to depend on stores directly you quickly get into circular dependency issues. You might consider putting all your state in a common AppState object that only the stores will inject.
+
+### Testing stores
+When Angular Mock is loaded flux-angular will reset stores automatically.
+
+```javascript
+describe('adding items', function () {
+
+  beforeEach(module('app'));
+
+  it('it should add strings dispatched to addItem', inject(function (MyStore, flux) {
+    flux.dispatch('addItem', 'foo')
+    expect(MyStore.getItems()).toEqual(['foo']);
+  }));
+
+  it('it should add number dispatched to addItem', inject(function (MyStore, flux) {
+    flux.dispatch('addItem', 1)
+    expect(MyStore.getItems()).toEqual([1]);
+  }));
+
+});
+
+```
 
 ### Performance
 Any $scopes listening to stores are removed when the $scope is destroyed. When it comes to cloning it only happens when you pull data out from a store. So an array of 10.000 items in the store is not a problem, because your application would probably not want to show all 10.000 items at any time. In this scenario your getter method probably does a filter, or a limit before returning the data.
