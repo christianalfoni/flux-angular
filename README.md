@@ -58,16 +58,16 @@ angular.module('app', ['flux'])
   
   $scope.comment = '';
 
-  $scope.addComment = function () {
-    flux.dispatch('addComment', $scope.comment);
-    $scope.comment = '';
-  };
-
   // $listenTo to listen to changes in store. Callback
   // runs on registration to update the $scope
   $scope.$listenTo(MyStore, function () {
     $scope.comments = MyStore.getComments();
   });
+
+  $scope.addComment = function () {
+    flux.dispatch('addComment', $scope.comment);
+    $scope.comment = '';
+  };
 
 });
 ```
