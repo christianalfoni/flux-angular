@@ -12,29 +12,29 @@ var storeExports = [];
 var stores = [];
 var storeNames = [];
 
-var Flux = (function() {
+var Flux = (function () {
 
   var Flux = function () {
     Dispatchr.apply(this, arguments);
   };
 
-  Object.keys(Dispatchr).forEach(function(key) {
+  Object.keys(Dispatchr).forEach(function (key) {
     Flux[key] = Dispatchr[key];
   });
 
   util.inherits(Flux, Dispatchr);
 
-  Flux.prototype.createStore = function(name, spec) {
+  Flux.prototype.createStore = function (name, spec) {
 
     spec = spec || {};
 
     /* Yahoo Dispatchr store interface */
-    function Store (dispatcher) {
+    function Store(dispatcher) {
       this.dispatcher = dispatcher;
 
       // For conveniance, makes more sense
       this.waitFor = function (store, cb) {
-          dispatcher.waitFor(store, cb.bind(this));
+        dispatcher.waitFor(store, cb.bind(this));
       };
 
       EventEmitter2.call(this, {
@@ -74,11 +74,28 @@ var Flux = (function() {
 
 var moduleConstructor = angular.module;
 
-angular.module = function() {
+angular.module = function () {
   var moduleInstance = moduleConstructor.apply(angular, arguments);
 
-  moduleInstance.store = function(storeName, storeDefinition) {
-    this.factory(storeName, ['$injector', 'flux', function($injector, flux) {
+  moduleInstance.store = function (storeName, storeDefinition) {
+    this.factory(storeName, ['$injector', 'flux', function ($injector, flux) {
+
+      // Detect if mocks is loaded. Remove the store and related handlers to
+      // reset it
+      if (angular.mock) {
+
+        delete Dispatchr.stores[storeName];
+        Object.keys(Dispatchr.handlers).forEach(function (handler) {
+          Dispatchr.handlers[handler] = Dispatchr.handlers[handler].filter(function (handlerStore) {
+            return handlerStore.name !== storeName;
+          });
+          if (!Dispatchr.handlers[handler].length) {
+            delete Dispatchr.handlers[handler];
+          }
+        });
+
+      }
+
       var storeConfig = $injector.invoke(storeDefinition);
       flux.createStore(storeName, storeConfig);
 
@@ -102,7 +119,6 @@ angular.module = function() {
 
     // Add store names for pre-injection 
     storeNames.push(storeName);
-    
     return this;
   };
 
@@ -110,31 +126,31 @@ angular.module = function() {
 };
 
 angular.module('flux', [])
-.service('flux', Flux)
-.run(['$rootScope', '$timeout', '$injector', function($rootScope, $timeout, $injector) {
+  .service('flux', Flux)
+  .run(['$rootScope', '$timeout', '$injector', function ($rootScope, $timeout, $injector) {
 
-  // Pre-inject all stores
-  $injector.invoke(storeNames.concat(function () {}));
+    // Pre-inject all stores
+    $injector.invoke(storeNames.concat(function () {}));
 
-  // Extend scopes with $listenTo
-  $rootScope.constructor.prototype.$listenTo = function (storeExport, eventName, callback) {
+    // Extend scopes with $listenTo
+    $rootScope.constructor.prototype.$listenTo = function (storeExport, eventName, callback) {
 
-    if (!callback) {
-      callback = eventName;
-      eventName = '*';
-    }
+      if (!callback) {
+        callback = eventName;
+        eventName = '*';
+      }
 
-    callback = callback.bind(this);
+      callback = callback.bind(this);
 
-    var store = stores[storeExports.indexOf(storeExport)];
-    var addMethod = eventName === '*' ? 'onAny' : 'on';
-    var removeMethod = eventName === '*' ? 'offAny' : 'off';
-    var args = eventName === '*' ? [callback] : [eventName, callback];
+      var store = stores[storeExports.indexOf(storeExport)];
+      var addMethod = eventName === '*' ? 'onAny' : 'on';
+      var removeMethod = eventName === '*' ? 'offAny' : 'off';
+      var args = eventName === '*' ? [callback] : [eventName, callback];
 
-    store[addMethod].apply(store, args);
-    this.$on('$destroy', function () {
-      store[removeMethod].apply(store, args);
-    });
+      store[addMethod].apply(store, args);
+      this.$on('$destroy', function () {
+        store[removeMethod].apply(store, args);
+      });
 
-  };
-}]);
+    };
+  }]);

@@ -135,8 +135,49 @@ angular.module('app', ['flux'])
 ```
 The **waitFor** method allows you to let other stores handle the action before the current store acts upon it. You can also pass an array of stores. It was decided to run this method straight off the store, as it gives more sense and now the callback is bound to the store itself.
 
+### Lots of actions, use constants
+When you develop a larger application, especially with lots of async operations it can be a good idea to define your actions as constants. That way it is less likely that a typo becomes confusing.
+
+```javascript
+angular.module('app', ['flux'])
+.constant('actions', {
+  'COMMENT_ADD': 'comment_add'
+})
+.controller('MyCtrl', function (flux, actions) {
+  $scope.addComment = function (comment) {
+    flux.dispatch(actions.COMMENT_ADD, comment);
+  };
+});
+```
+
+### Async operations
+It is not recommended to run async operations in your stor handlers. The reason is that you would have a harder time testing. A dispatched messages could result in an async operation. But also the **waitFor** method requires the handlers to be synchronous. So they way you solve this is having async services.
+
+```javascript
+angular.module('app', ['flux'])
+.constant('actions', {
+  'COMMENT_ADD': 'comment_add',
+  'COMMENT_ADD_SUCCESS': 'comment_add_success',
+  'COMMENT_ADD_ERROR': 'comment_add_error'
+})
+.factory('Backend', function ($http, flux, actions) {
+  return {
+    addComment: function (comment) {
+      flux.dispatch(actions.COMMENT_ADD, comment);
+      $http.post('/comments', comment)
+      .success(function () {
+        flux.dispatch(actions.COMMENT_ADD_SUCCESS, comment);
+      })
+      .error(function (error) {
+        flux.dispatch(actions.COMMENT_ADD_ERROR, comment, error);
+      });
+    }
+  };
+});
+```
+
 ### Get values from other stores
-If your application is structured in such a manner that you need to share state between stores you can create a shared state object:
+If your application is structured in such a manner that you need to share state between stores you can create a shared state service:
 
 ```javascript
 angular.module('app', ['flux'])
