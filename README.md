@@ -14,6 +14,7 @@ There are some pretty big changes to the API in the new version. If you want to 
 
 ## Changes
 **2.1.0**:
+  - Thanks to @SuperheroicCoding for great discussions!
   - Refactored implementation
   - Added tests
   - flux.createStore to manually creates stores
