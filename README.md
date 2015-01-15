@@ -71,16 +71,16 @@ angular.module('app', ['flux'])
   
   $scope.comment = '';
 
-  $scope.addComment = function () {
-    flux.dispatch('addComment', $scope.comment);
-    $scope.comment = '';
-  };
-
   // $listenTo to listen to changes in store. Callback
   // runs on registration to update the $scope
   $scope.$listenTo(MyStore, function () {
     $scope.comments = MyStore.getComments();
   });
+
+  $scope.addComment = function () {
+    flux.dispatch('addComment', $scope.comment);
+    $scope.comment = '';
+  };
 
 });
 ```
@@ -168,7 +168,7 @@ angular.module('app', ['flux'])
 ```
 
 ### Async operations
-It is not recommended to run async operations in your store handlers. The reason is that you would have a harder time testing and. The **waitFor** method also requires the handlers to be synchronous. So they way you solve this is having async services.
+It is not recommended to run async operations in your store handlers. The reason is that you would have a harder time testing and the **waitFor** method also requires the handlers to be synchronous. You solve this by having async services.
 
 ```javascript
 angular.module('app', ['flux'])
