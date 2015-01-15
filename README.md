@@ -13,6 +13,12 @@ There are some pretty big changes to the API in the new version. If you want to 
 - **Immutable**
 
 ## Changes
+**2.1.0**:
+  - Refactored implementation
+  - Added tests
+  - flux.createStore to manually creates stores
+  - waitFor gives error if awaiting store is not injected
+
 **2.0.1**:
   - Added automatic reset of stores during testing
 
@@ -47,6 +53,13 @@ angular.module('app', ['flux'])
 
   };
 
+})
+// You can also use a factory
+.factory('Stores', function (flux) {
+  return {
+    'StoreA': flux.createStore('StoreA', {}),
+    'StoreB': flux.createStore('StoreB', {})
+  }
 });
 ```
 A store in flux-angular works just like the **Yahoo Dispatchr**, it IS the Yahoo Dispatchr. The only difference is an extra property called **exports**. So **exports** and **handlers** are special properties. **handlers** is an object defining what dispatched actions to listen to and what method to run when that occurs. **exports** is an object defining methods to expose to controllers. The methods in the exports object is bound to the store. Any data returned by an export method is cloned. This keeps the store immutable. If you need to use an other export method inside an export method use **this.exports.myOtherExport()** to do so. That will not cause cloning. 
@@ -261,6 +274,8 @@ describe('adding items', function () {
 ### Performance
 Any $scopes listening to stores are removed when the $scope is destroyed. When it comes to cloning it only happens when you pull data out from a store. So an array of 10.000 items in the store is not a problem, because your application would probably not want to show all 10.000 items at any time. In this scenario your getter method probably does a filter, or a limit before returning the data.
 
+### Run tests
+`karma start` and open browser at `http://localhost:9876/`
 
 License
 -------

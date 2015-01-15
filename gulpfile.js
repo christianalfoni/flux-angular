@@ -6,7 +6,6 @@ var watchify = require('watchify');
 var notify = require('gulp-notify');
 var gutil = require('gulp-util');
 var jshint = require('gulp-jshint');
-var packageJson = require('./package.json');
 var stylish = require('jshint-stylish');
 
 var scripts = ['./src/*.js', './gulpfile.js'];
@@ -28,7 +27,7 @@ var browserifyTask = function (options) {
     console.log('Building APP bundle');
     appBundler.bundle()
       .on('error', gutil.log)
-      .pipe(source('flux-angular-' + packageJson.version + '.js'))
+      .pipe(source('flux-angular.js'))
       .pipe(gulp.dest(options.dest))
       .pipe(notify(function () {
         console.log('APP bundle built in ' + (Date.now() - start) + 'ms');
