@@ -183,9 +183,6 @@ angular.module('flux', [])
         store[removeMethod].apply(store, args);
       });
 
-      // Run the callback to give initial state from the store
-      callback();
-
     };
 
   }]);

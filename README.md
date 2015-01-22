@@ -13,6 +13,9 @@ There are some pretty big changes to the API in the new version. If you want to 
 - **Immutable**
 
 ## Changes
+**2.1.1**:
+  - Callback only triggers on actual store event emitting now, not on initial registration
+
 **2.1.0**:
   - Refactored implementation
   - Added tests
@@ -71,8 +74,7 @@ angular.module('app', ['flux'])
   
   $scope.comment = '';
 
-  // $listenTo to listen to changes in store. Callback
-  // runs on registration to update the $scope
+  // $listenTo to listen to changes in store
   $scope.$listenTo(MyStore, function () {
     $scope.comments = MyStore.getComments();
   });

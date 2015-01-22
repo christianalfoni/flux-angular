@@ -232,19 +232,12 @@ describe('FLUX-ANGULAR', function () {
       expect($scope.$listenTo).toBeDefined();
     }));
 
-    it('should instantly call the callback of $listenTo', inject(function (MyStore, $rootScope) {
-      var $scope = $rootScope.$new();
-      var cb = jasmine.createSpy('callback');
-      $scope.$listenTo(MyStore, cb);
-      expect(cb).toHaveBeenCalled();
-    }));
-
     it('should call the callback when change event is emitted', inject(function (MyStore, $rootScope, flux) {
       var $scope = $rootScope.$new();
       var cb = jasmine.createSpy('callback');
       $scope.$listenTo(MyStore, cb);
       flux.dispatch('addItem', 'foo');
-      expect(cb.calls.count()).toEqual(2);
+      expect(cb.calls.count()).toEqual(1);
     }));
 
     it('should call the callback if specific event is listened to and emitted', inject(function (MyStore, $rootScope, flux) {
@@ -252,7 +245,7 @@ describe('FLUX-ANGULAR', function () {
       var cb = jasmine.createSpy('callback');
       $scope.$listenTo(MyStore, 'event', cb);
       flux.dispatch('triggerEvent');
-      expect(cb.calls.count()).toEqual(2);
+      expect(cb.calls.count()).toEqual(1);
     }));
 
   });
