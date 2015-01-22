@@ -17,6 +17,7 @@ There are some pretty big changes to the API in the new version. If you want to 
   - Callback only triggers on actual store event emitting now, not on initial registration
 
 **2.1.0**:
+  - Thanks to @SuperheroicCoding for great discussions!
   - Refactored implementation
   - Added tests
   - flux.createStore to manually creates stores
