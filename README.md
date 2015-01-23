@@ -30,7 +30,7 @@ There are some pretty big changes to the API in the new version. If you want to 
 flux-angular 2 uses a more traditional flux pattern. It has the [Yahoo Dispatchr](https://github.com/yahoo/dispatchr) and [EventEmitter2](https://github.com/asyncly/EventEmitter2) for its event emitting. **Did you really monkeypatch Angular?**. Yes. Angular has a beautiful API (except directives ;-) ) and I did not want flux-angular to feel like an alien syntax invasion, but rather it being a natural part of the Angular habitat. Angular 1.x is a stable codebase and I would be very surprised if this monkeypatch would be affected in later versions.
 
 ## FAQ
-** PhantomJS gives me an error on usage on function bind method**:
+**PhantomJS gives me an error on usage on function bind method**:
 PhantomJS does not support ES5 `Function.prototype.bind`, but will in next version. Until then be sure to load the [ES5 shim](https://github.com/es-shims/es5-shim) with your tests.
 
 ## Create a store
