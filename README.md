@@ -175,7 +175,7 @@ angular.module('app', ['flux'])
 ```
 
 ### Async operations
-It is not recommended to run async operations in your store handlers. The reason is that you would have a harder time testing and the **waitFor** method also requires the handlers to be synchronous. You solve this by having async services.
+It is not recommended to run async operations in your store handlers. The reason is that you would have a harder time testing and the **waitFor** method also requires the handlers to be synchronous. You solve this by having async services, also called *action creators*.
 
 ```javascript
 angular.module('app', ['flux'])
@@ -184,7 +184,7 @@ angular.module('app', ['flux'])
   'COMMENT_ADD_SUCCESS': 'comment_add_success',
   'COMMENT_ADD_ERROR': 'comment_add_error'
 })
-.factory('Backend', function ($http, flux, actions) {
+.factory('CommentActions', function ($http, flux, actions) {
   return {
     addComment: function (comment) {
       flux.dispatch(actions.COMMENT_ADD, comment);
@@ -198,9 +198,9 @@ angular.module('app', ['flux'])
     }
   };
 })
-.controller('MyCtrl', function (Backend) {
+.controller('MyCtrl', function (CommentActions) {
   $scope.addComment = function () {
-    Backend.addComment({content: 'foo'});
+    CommentActions.addComment({content: 'foo'});
   };
 });
 ```
