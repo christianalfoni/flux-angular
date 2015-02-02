@@ -175,7 +175,7 @@ angular.module('app', ['flux'])
 ```
 
 ### Async operations
-It is not recommended to run async operations in your store handlers. The reason is that you would have a harder time testing and the **waitFor** method also requires the handlers to be synchronous. You solve this by having async services, also called *action creators*.
+It is not recommended to run async operations in your store handlers. The reason is that you would have a harder time testing and the **waitFor** method also requires the handlers to be synchronous. You solve this by having async services, also called **action creators**.
 
 ```javascript
 angular.module('app', ['flux'])
