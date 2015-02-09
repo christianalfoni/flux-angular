@@ -33,6 +33,10 @@ There are some pretty big changes to the API in the new version. If you want to 
 ## Concept
 flux-angular 2 uses a more traditional flux pattern. It has the [Yahoo Dispatchr](https://github.com/yahoo/dispatchr) and [EventEmitter2](https://github.com/asyncly/EventEmitter2) for its event emitting. **Did you really monkeypatch Angular?**. Yes. Angular has a beautiful API (except directives ;-) ) and I did not want flux-angular to feel like an alien syntax invasion, but rather it being a natural part of the Angular habitat. Angular 1.x is a stable codebase and I would be very surprised if this monkeypatch would be affected in later versions.
 
+## FAQ
+**PhantomJS gives me an error related to bind**:
+PhantomJS does not support ES5 `Function.prototype.bind`, but will in next version. Until then be sure to load the [ES5 shim](https://github.com/es-shims/es5-shim) with your tests.
+
 ## Create a store
 ```javascript
 angular.module('app', ['flux'])
@@ -175,7 +179,7 @@ angular.module('app', ['flux'])
 ```
 
 ### Async operations
-It is not recommended to run async operations in your store handlers. The reason is that you would have a harder time testing and the **waitFor** method also requires the handlers to be synchronous. You solve this by having async services.
+It is not recommended to run async operations in your store handlers. The reason is that you would have a harder time testing and the **waitFor** method also requires the handlers to be synchronous. You solve this by having async services, also called **action creators**.
 
 ```javascript
 angular.module('app', ['flux'])
@@ -184,7 +188,7 @@ angular.module('app', ['flux'])
   'COMMENT_ADD_SUCCESS': 'comment_add_success',
   'COMMENT_ADD_ERROR': 'comment_add_error'
 })
-.factory('Backend', function ($http, flux, actions) {
+.factory('CommentActions', function ($http, flux, actions) {
   return {
     addComment: function (comment) {
       flux.dispatch(actions.COMMENT_ADD, comment);
@@ -198,9 +202,9 @@ angular.module('app', ['flux'])
     }
   };
 })
-.controller('MyCtrl', function (Backend) {
+.controller('MyCtrl', function (CommentActions) {
   $scope.addComment = function () {
-    Backend.addComment({content: 'foo'});
+    CommentActions.addComment({content: 'foo'});
   };
 });
 ```
