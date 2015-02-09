@@ -69,6 +69,7 @@ var FluxService = function () {
   };
 
   this.createStore = function (name, spec) {
+
     var store = createStore(name, spec, this);
     var storeInstance;
 
@@ -129,7 +130,7 @@ var FluxService = function () {
 
 // Wrap "angular.module" to attach store method to module instance
 var angularModule = angular.module;
-
+var preInjectList = [];
 angular.module = function () {
 
   // Call the module as normaly and grab the instance
@@ -137,6 +138,9 @@ angular.module = function () {
 
   // Attach store method to instance
   moduleInstance.store = function (storeName, storeDefinition) {
+
+    // Add to preinject array
+    preInjectList.push(storeName);
 
     // Create a new store
     this.factory(storeName, ['$injector', 'flux', function ($injector, flux) {
@@ -158,9 +162,13 @@ angular.module('flux', [])
   .service('flux', FluxService)
   .run(['$rootScope', '$injector', 'flux', function ($rootScope, $injector, flux) {
 
-
     if (angular.mock) {
       flux.reset();
+    } else {
+      
+      // Pre-inject all stores when not testing
+      $injector.invoke(preInjectList.concat(function () {}));
+
     }
 
     // Extend scopes with $listenTo
@@ -1581,7 +1589,7 @@ function safeDeepClone(circularValue, refs, obj) {
   var copy;
 
   // object is a false or empty value, or otherwise not an object
-  if (!obj || 'object' !== typeof obj || obj instanceof ArrayBuffer || obj instanceof Blob || obj instanceof File) return obj;
+  if (!obj || 'object' !== typeof obj || obj instanceof Error || obj instanceof ArrayBuffer || obj instanceof Blob || obj instanceof File) return obj;
 
   // Handle Date
   if (obj instanceof Date) {
@@ -1608,13 +1616,12 @@ function safeDeepClone(circularValue, refs, obj) {
 
   // Handle Object
   refs.push(obj);
-  copy = {};
 
-  if (obj instanceof Error) {
-    //raise inherited error properties for the clone
-    copy.name = obj.name;
-    copy.message = obj.message;
-    copy.stack = obj.stack;
+  // Bring a long prototype
+  if (obj.constructor && obj.constructor !== Object) {
+    copy = Object.create(obj.constructor.prototype);
+  } else {
+    copy = {};
   }
 
   for (var attr in obj) {

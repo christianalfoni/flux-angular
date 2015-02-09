@@ -42,48 +42,6 @@ describe('FLUX-ANGULAR', function () {
 
   });
 
-  describe('Using the store method', function () {
-
-    beforeEach(function () {
-
-      angular.module('test', ['flux'])
-        .factory('MyStore', function (flux) {
-          return flux.createStore('MyStore', {
-            items: [],
-            handlers: {
-              addItem: 'addItem'
-            },
-            addItem: function (item) {
-              this.items.push(item);
-            },
-            exports: {
-              getItems: function () {
-                return this.items;
-              }
-            }
-          });
-        });
-
-      module('test');
-
-    });
-
-    it('should expose the exports object of the store', inject(function (MyStore) {
-      expect(MyStore.getItems).toBeDefined();
-    }));
-
-    it('should clone state values when exported', inject(function (MyStore, flux) {
-      var store = flux.getStore(MyStore);
-      expect(MyStore.getItems()).not.toBe(store.items);
-    }));
-
-    it('should handle a dispatched message', inject(function (MyStore, flux) {
-      flux.dispatch('addItem', 'foo');
-      expect(MyStore.getItems()[0]).toEqual('foo');
-    }));
-
-  });
-
   describe('Waiting for other stores', function () {
 
     beforeEach(function () {
@@ -154,48 +112,6 @@ describe('FLUX-ANGULAR', function () {
 
   });
 
-  describe('Using the store method', function () {
-
-    beforeEach(function () {
-
-      angular.module('test', ['flux'])
-        .store('MyStore', function () {
-          return {
-            items: [],
-            handlers: {
-              addItem: 'addItem'
-            },
-            addItem: function (item) {
-              this.items.push(item);
-            },
-            exports: {
-              getItems: function () {
-                return this.items;
-              }
-            }
-          };
-        });
-
-      module('test');
-
-    });
-
-    it('should expose the exports object of the store', inject(function (MyStore) {
-      expect(MyStore.getItems).toBeDefined();
-    }));
-
-    it('should clone state values when exported', inject(function (MyStore, flux) {
-      var store = flux.getStore(MyStore);
-      expect(MyStore.getItems()).not.toBe(store.items);
-    }));
-
-    it('should handle a dispatched message', inject(function (MyStore, flux) {
-      flux.dispatch('addItem', 'foo');
-      expect(MyStore.getItems()[0]).toEqual('foo');
-    }));
-
-  });
-
   describe('Listening to events', function () {
 
     beforeEach(function () {
@@ -246,6 +162,16 @@ describe('FLUX-ANGULAR', function () {
       $scope.$listenTo(MyStore, 'event', cb);
       flux.dispatch('triggerEvent');
       expect(cb.calls.count()).toEqual(1);
+    }));
+
+    it('should keep the prototype of objects when retrieved from the store', inject(function (MyStore, $rootScope, flux) {
+      var MyObject = function () { this.foo = 'bar'; };
+      MyObject.prototype = {constructor: MyObject, getFoo: function () { return this.foo; }};
+      var $scope = $rootScope.$new();
+      $scope.$listenTo(MyStore, function () {
+        expect(MyStore.getItems()[0].getFoo()).toEqual('bar');
+      });
+      flux.dispatch('addItem', new MyObject());
     }));
 
   });
