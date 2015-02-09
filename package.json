@@ -1,6 +1,6 @@
 {
   "name": "flux-angular",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "A FLUX architecture for Angular JS",
   "main": "./src/main.js",
   "scripts": {
@@ -25,7 +25,9 @@
   },
   "dependencies": {
     "angular": "~1.2",
+    "baobab": "^0.2.2",
     "dispatchr": "^0.2.8",
-    "eventemitter2": "^0.4.14"
+    "eventemitter2": "^0.4.14",
+    "immutable": "^3.6.2"
   }
 }

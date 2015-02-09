@@ -67,6 +67,7 @@ var FluxService = function () {
   };
 
   this.createStore = function (name, spec) {
+
     var store = createStore(name, spec, this);
     var storeInstance;
 
@@ -127,7 +128,7 @@ var FluxService = function () {
 
 // Wrap "angular.module" to attach store method to module instance
 var angularModule = angular.module;
-
+var preInjectList = [];
 angular.module = function () {
 
   // Call the module as normaly and grab the instance
@@ -135,6 +136,9 @@ angular.module = function () {
 
   // Attach store method to instance
   moduleInstance.store = function (storeName, storeDefinition) {
+
+    // Add to preinject array
+    preInjectList.push(storeName);
 
     // Create a new store
     this.factory(storeName, ['$injector', 'flux', function ($injector, flux) {
@@ -156,9 +160,13 @@ angular.module('flux', [])
   .service('flux', FluxService)
   .run(['$rootScope', '$injector', 'flux', function ($rootScope, $injector, flux) {
 
-
     if (angular.mock) {
       flux.reset();
+    } else {
+      
+      // Pre-inject all stores when not testing
+      $injector.invoke(preInjectList.concat(function () {}));
+
     }
 
     // Extend scopes with $listenTo

@@ -13,6 +13,10 @@ There are some pretty big changes to the API in the new version. If you want to 
 - **Immutable**
 
 ## Changes
+**2.1.2**:
+  - Cloning now keeps prototype of object, if not Object
+  - Stores are now pre-injected. This is to avoid confusion where you trigger dispatches in for example UI router (store is not yet injected)
+
 **2.1.1**:
   - Callback only triggers on actual store event emitting now, not on initial registration
 

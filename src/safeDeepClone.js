@@ -5,7 +5,7 @@ function safeDeepClone(circularValue, refs, obj) {
   var copy;
 
   // object is a false or empty value, or otherwise not an object
-  if (!obj || 'object' !== typeof obj || obj instanceof ArrayBuffer || obj instanceof Blob || obj instanceof File) return obj;
+  if (!obj || 'object' !== typeof obj || obj instanceof Error || obj instanceof ArrayBuffer || obj instanceof Blob || obj instanceof File) return obj;
 
   // Handle Date
   if (obj instanceof Date) {
@@ -32,13 +32,12 @@ function safeDeepClone(circularValue, refs, obj) {
 
   // Handle Object
   refs.push(obj);
-  copy = {};
 
-  if (obj instanceof Error) {
-    //raise inherited error properties for the clone
-    copy.name = obj.name;
-    copy.message = obj.message;
-    copy.stack = obj.stack;
+  // Bring a long prototype
+  if (obj.constructor && obj.constructor !== Object) {
+    copy = Object.create(obj.constructor.prototype);
+  } else {
+    copy = {};
   }
 
   for (var attr in obj) {

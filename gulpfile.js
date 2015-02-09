@@ -66,7 +66,7 @@ gulp.task('watch', function() {
   gulp.watch(scripts, ['lint']);
 });
 
-gulp.task('release', function () {
+gulp.task('deploy', function () {
 
   gulp.run('lint');
 
