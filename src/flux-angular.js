@@ -90,6 +90,19 @@ var FluxService = function () {
       };
     });
 
+    Object.getOwnPropertyNames(spec.exports).forEach(function (key) {
+      var descriptor = Object.getOwnPropertyDescriptor(spec.exports, key);
+      if (descriptor.get) {
+        Object.defineProperty(store.exports, key, {
+          enumerable: descriptor.enumerable,
+          configurable: descriptor.configurable,
+          get: function () {
+            return safeDeepClone('[Circular]', [], descriptor.get.apply(storeInstance, arguments));
+          }
+        });
+      }
+    });
+
     return store.exports;
 
   };
