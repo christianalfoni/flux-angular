@@ -85,10 +85,24 @@ var FluxService = function () {
 
     storeInstance = this.dispatcher.getStore(store);
     Object.keys(spec.exports).forEach(function (key) {
-      store.exports[key] = function () {
-        return safeDeepClone('[Circular]', [], spec.exports[key].apply(storeInstance, arguments));
-      };
-      spec.exports[key] = spec.exports[key].bind(storeInstance);
+
+      // Create a getter
+      var descriptor = Object.getOwnPropertyDescriptor(spec.exports, key);
+      if (descriptor.get) {
+        Object.defineProperty(store.exports, key, {
+          enumerable: descriptor.enumerable,
+          configurable: descriptor.configurable,
+          get: function () {
+            return safeDeepClone('[Circular]', [], descriptor.get.apply(storeInstance, arguments));
+          }
+        });
+      } else {
+        store.exports[key] = function () {
+          return safeDeepClone('[Circular]', [], spec.exports[key].apply(storeInstance, arguments));
+        };
+        spec.exports[key] = spec.exports[key].bind(storeInstance);
+      }
+
     });
 
     return store.exports;
@@ -164,7 +178,7 @@ angular.module('flux', [])
     if (angular.mock) {
       flux.reset();
     } else {
-      
+
       // Pre-inject all stores when not testing
       $injector.invoke(preInjectList.concat(function () {}));
 

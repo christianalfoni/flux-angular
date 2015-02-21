@@ -16,6 +16,8 @@ There are some pretty big changes to the API in the new version. If you want to 
 **2.1.3**:
   - Fixed binding of export methods (thanks @Nihat)
   - Fixed missing development deps
+  - Now supports getter functions in exports, cool stuff! (thanks @mlegenhausen)
+  - Added tests and updated documentation
 
 **2.1.2**:
   - Cloning now keeps prototype of object, if not Object
@@ -62,7 +64,14 @@ angular.module('app', ['flux'])
 
     // Getters
     exports: {
+
+      // Traditional getter
       getComments: function () {
+        return this.comments;
+      },
+
+      // A getter getter :-)
+      get comments() {
         return this.comments;
       }
     }
@@ -90,6 +99,8 @@ angular.module('app', ['flux'])
   // $listenTo to listen to changes in store
   $scope.$listenTo(MyStore, function () {
     $scope.comments = MyStore.getComments();
+    // or
+    $scope.comments = MyStore.comments;
   });
 
   $scope.addComment = function () {

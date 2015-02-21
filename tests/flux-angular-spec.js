@@ -20,6 +20,9 @@ describe('FLUX-ANGULAR', function () {
               },
               getFirstItem: function () {
                 return this.exports.getItems()[0];
+              },
+              get items() {
+                return this.items;
               }
             }
           };
@@ -31,16 +34,19 @@ describe('FLUX-ANGULAR', function () {
 
     it('should expose the exports object of the store', inject(function (MyStore) {
       expect(MyStore.getItems).toBeDefined();
+      expect(MyStore.items).toBeDefined();
     }));
 
     it('should clone state values when exported', inject(function (MyStore, flux) {
       var store = flux.getStore(MyStore);
       expect(MyStore.getItems()).not.toBe(store.items);
+      expect(MyStore.items).not.toBe(store.items);
     }));
 
     it('should handle a dispatched message', inject(function (MyStore, flux) {
       flux.dispatch('addItem', 'foo');
       expect(MyStore.getItems()[0]).toEqual('foo');
+      expect(MyStore.items[0]).toEqual('foo');
     }));
 
     it('should bind export methods to the store instance', inject(function (MyStore, flux) {
