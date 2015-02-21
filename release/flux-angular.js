@@ -87,9 +87,24 @@ var FluxService = function () {
 
     storeInstance = this.dispatcher.getStore(store);
     Object.keys(spec.exports).forEach(function (key) {
-      store.exports[key] = function () {
-        return safeDeepClone('[Circular]', [], spec.exports[key].apply(storeInstance, arguments));
-      };
+
+      // Create a getter
+      var descriptor = Object.getOwnPropertyDescriptor(spec.exports, key);
+      if (descriptor.get) {
+        Object.defineProperty(store.exports, key, {
+          enumerable: descriptor.enumerable,
+          configurable: descriptor.configurable,
+          get: function () {
+            return safeDeepClone('[Circular]', [], descriptor.get.apply(storeInstance, arguments));
+          }
+        });
+      } else {
+        store.exports[key] = function () {
+          return safeDeepClone('[Circular]', [], spec.exports[key].apply(storeInstance, arguments));
+        };
+        spec.exports[key] = spec.exports[key].bind(storeInstance);
+      }
+
     });
 
     return store.exports;
@@ -165,7 +180,7 @@ angular.module('flux', [])
     if (angular.mock) {
       flux.reset();
     } else {
-      
+
       // Pre-inject all stores when not testing
       $injector.invoke(preInjectList.concat(function () {}));
 
@@ -468,29 +483,36 @@ module.exports = function () {
         var self = this,
             allHandlers = actionHandlers.concat(defaultHandlers),
             handlerFns = {};
-        allHandlers.forEach(function actionHandlersEach(store) {
-            if (handlerFns[store.name]) {
-                // Don't call the default if the store has an explicit action handler
-                return;
-            }
-            var storeInstance = self.getStore(store.name);
-            if ('function' === typeof store.handler) {
-                handlerFns[store.name] = store.handler.bind(storeInstance);
-            } else {
-                if (!storeInstance[store.handler]) {
-                    throw new Error(store.name + ' does not have a method called ' + store.handler);
+
+        try {
+            allHandlers.forEach(function actionHandlersEach(store) {
+                if (handlerFns[store.name]) {
+                    // Don't call the default if the store has an explicit action handler
+                    return;
                 }
-                handlerFns[store.name] = storeInstance[store.handler].bind(storeInstance);
-            }
-        });
-        this.currentAction.execute(handlerFns);
-        debug('finished ' + this.currentAction.name);
-        this.currentAction = null;
+                var storeInstance = self.getStore(store.name);
+                if ('function' === typeof store.handler) {
+                    handlerFns[store.name] = store.handler.bind(storeInstance);
+                } else {
+                    if (!storeInstance[store.handler]) {
+                        throw new Error(store.name + ' does not have a method called ' + store.handler);
+                    }
+                    handlerFns[store.name] = storeInstance[store.handler].bind(storeInstance);
+                }
+            });
+            this.currentAction.execute(handlerFns);
+        } catch (e) {
+            throw e;
+        } finally {
+            debug('finished ' + actionName);
+            this.currentAction = null;
+        }
     };
 
     /**
      * Returns a raw data object representation of the current state of the
-     * dispatcher and all store instances
+     * dispatcher and all store instances. If the store implements a shouldDehdyrate
+     * function, then it will be called and only dehydrate if the method returns `true`
      * @method dehydrate
      * @returns {Object} dehydrated dispatcher data
      */
@@ -499,9 +521,10 @@ module.exports = function () {
             stores = {};
         Object.keys(self.storeInstances).forEach(function storeInstancesEach(storeName) {
             var store = self.storeInstances[storeName];
-            if (store.dehydrate) {
-                stores[storeName] = store.dehydrate();
+            if (!store.dehydrate || (store.shouldDehydrate && !store.shouldDehydrate())) {
+                return;
             }
+            stores[storeName] = store.dehydrate();
         });
         return {
             stores: stores
@@ -559,6 +582,17 @@ exports.formatArgs = formatArgs;
 exports.save = save;
 exports.load = load;
 exports.useColors = useColors;
+
+/**
+ * Use chrome.storage.local if we are in an app
+ */
+
+var storage;
+
+if (typeof chrome !== 'undefined' && typeof chrome.storage !== 'undefined')
+  storage = chrome.storage.local;
+else
+  storage = window.localStorage;
 
 /**
  * Colors.
@@ -649,10 +683,10 @@ function formatArgs() {
  */
 
 function log() {
-  // This hackery is required for IE8,
-  // where the `console.log` function doesn't have 'apply'
-  return 'object' == typeof console
-    && 'function' == typeof console.log
+  // this hackery is required for IE8/9, where
+  // the `console.log` function doesn't have 'apply'
+  return 'object' === typeof console
+    && console.log
     && Function.prototype.apply.call(console.log, console, arguments);
 }
 
@@ -666,9 +700,9 @@ function log() {
 function save(namespaces) {
   try {
     if (null == namespaces) {
-      localStorage.removeItem('debug');
+      storage.removeItem('debug');
     } else {
-      localStorage.debug = namespaces;
+      storage.debug = namespaces;
     }
   } catch(e) {}
 }
@@ -683,7 +717,7 @@ function save(namespaces) {
 function load() {
   var r;
   try {
-    r = localStorage.debug;
+    r = storage.debug;
   } catch(e) {}
   return r;
 }
