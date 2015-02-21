@@ -88,6 +88,7 @@ var FluxService = function () {
       store.exports[key] = function () {
         return safeDeepClone('[Circular]', [], spec.exports[key].apply(storeInstance, arguments));
       };
+      spec.exports[key] = spec.exports[key].bind(storeInstance);
     });
 
     return store.exports;

@@ -17,6 +17,9 @@ describe('FLUX-ANGULAR', function () {
             exports: {
               getItems: function () {
                 return this.items;
+              },
+              getFirstItem: function () {
+                return this.exports.getItems()[0];
               }
             }
           };
@@ -39,6 +42,11 @@ describe('FLUX-ANGULAR', function () {
       flux.dispatch('addItem', 'foo');
       expect(MyStore.getItems()[0]).toEqual('foo');
     }));
+
+    it('should bind export methods to the store instance', inject(function (MyStore, flux) {
+      flux.dispatch('addItem', 'foo');
+      expect(MyStore.getFirstItem()).toEqual('foo');
+    }))
 
   });
 

@@ -13,6 +13,10 @@ There are some pretty big changes to the API in the new version. If you want to 
 - **Immutable**
 
 ## Changes
+**2.1.3**:
+  - Fixed binding of export methods (thanks @Nihat)
+  - Fixed missing development deps
+
 **2.1.2**:
   - Cloning now keeps prototype of object, if not Object
   - Stores are now pre-injected. This is to avoid confusion where you trigger dispatches in for example UI router (store is not yet injected)
@@ -285,8 +289,11 @@ describe('adding items', function () {
 ### Performance
 Any $scopes listening to stores are removed when the $scope is destroyed. When it comes to cloning it only happens when you pull data out from a store. So an array of 10.000 items in the store is not a problem, because your application would probably not want to show all 10.000 items at any time. In this scenario your getter method probably does a filter, or a limit before returning the data.
 
-### Run tests
-`karma start` and open browser at `http://localhost:9876/`
+### Run project
+1. `npm install`
+2. `bower install`
+3. `gulp build`
+4. `npm test` and open browser at `http://localhost:9876/`
 
 License
 -------
