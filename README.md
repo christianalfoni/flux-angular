@@ -13,7 +13,7 @@ There are some pretty big changes to the API in the new version. If you want to 
 - **Immutable**
 
 ## Changes
-**2.1.3**:
+**2.2.0**:
   - Fixed binding of export methods (thanks @Nihat)
   - Fixed missing development deps
   - Now supports getter functions in exports, cool stuff! (thanks @mlegenhausen)
