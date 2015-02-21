@@ -1,8 +1,27 @@
 flux-angular
 ==========
 
-## Welcome to version 2 of flux-angular
-There are some pretty big changes to the API in the new version. If you want to keep using the previous API, go to [flux-angular 1.x](FLUX-ANGULAR-1.md). I would like to give special thanks to @sheerun for all the discussions and code contributions.
+## Flux-Angular 2 now has immutability mode!
+The API of flux-angular is really starting to shape up, but there is still one challenge. To create a one way flow flux-angular clones data retrieved from the exports of a store. This has two performance hits. First of all it is a deep clone process, which can have a high cost on complex data structures. Second Angular will always see data retrieved from getters as a new value, even if it has not changed. This forces Angular to always do a new render, even though there was no need for it.
+
+[immutable-store](https://github.com/christianalfoni/immutable-store) is a separate project that solves this issue. Flux-angular can now be run in an immutable mode, where you create immutable data structures for the stores.
+
+- [Features](#Features)
+- [Concept](#Concept)
+- [FAQ](#FAQ)
+- [Create a store](#Create-a-store)
+- [Grab state](#Grab-state)
+- [Dispatch actions](#Dispatch-actions)
+- [Immutable mode](#Immutable-mode)
+- [Event wildcards](#Event-wildcards)
+- [Wait for other stores to complete their handlers](#Wait-for-other-stores-to-complete-their-handlers)
+- [Lots of actions, use constants](#Lots-of-actions-use-constants)
+- [Async operations](#Async-operations)
+- [Testing stores](#Testing-stores)
+- [Performance](#Performance)
+- [Changes](#Changes)
+- [Run project](#Run-project)
+
 
 ## Features
 
@@ -12,48 +31,20 @@ There are some pretty big changes to the API in the new version. If you want to 
 - **Scope listenTo**
 - **Immutable**
 
-## Changes
-**2.2.0**:
-  - Fixed binding of export methods (thanks @Nihat)
-  - Fixed missing development deps
-  - Now supports getter functions in exports, cool stuff! (thanks @mlegenhausen)
-  - Added tests and updated documentation
-
-**2.1.2**:
-  - Cloning now keeps prototype of object, if not Object
-  - Stores are now pre-injected. This is to avoid confusion where you trigger dispatches in for example UI router (store is not yet injected)
-
-**2.1.1**:
-  - Callback only triggers on actual store event emitting now, not on initial registration
-
-**2.1.0**:
-  - Thanks to @SuperheroicCoding for great discussions!
-  - Refactored implementation
-  - Added tests
-  - flux.createStore to manually creates stores
-  - waitFor gives error if awaiting store is not injected
-
-**2.0.1**:
-  - Added automatic reset of stores during testing
-
 ## Concept
-flux-angular 2 uses a more traditional flux pattern. It has the [Yahoo Dispatchr](https://github.com/yahoo/dispatchr) and [EventEmitter2](https://github.com/asyncly/EventEmitter2) for its event emitting. **Did you really monkeypatch Angular?**. Yes. Angular has a beautiful API (except directives ;-) ) and I did not want flux-angular to feel like an alien syntax invasion, but rather it being a natural part of the Angular habitat. Angular 1.x is a stable codebase and I would be very surprised if this monkeypatch would be affected in later versions.
+flux-angular 2 uses a more traditional flux pattern. It has the [Yahoo Dispatchr](https://github.com/yahoo/dispatchr) and [EventEmitter2](https://github.com/asyncly/EventEmitter2) for its event emitting. It also includes the [immutable-store](https://github.com/christianalfoni/immutable-store) that you can use in the **immutable mode** of flux-angular. **Did you really monkeypatch Angular?**. Yes. Angular has a beautiful API (except directives ;-) ) and I did not want flux-angular to feel like an alien syntax invasion, but rather it being a natural part of the Angular habitat. Angular 1.x is a stable codebase and I would be very surprised if this monkeypatch would be affected in later versions.
 
 ## FAQ
 **PhantomJS gives me an error related to bind**:
 PhantomJS does not support ES5 `Function.prototype.bind`, but will in next version. Until then be sure to load the [ES5 shim](https://github.com/es-shims/es5-shim) with your tests.
 
+
 ## Create a store
 ```javascript
 angular.module('app', ['flux'])
-.store('MyStore', function () {
-
+.store('MyStore', function () { 
   return {
-
-    // State
     comments: [],
-
-    // Action handlers triggered by the dispatcher
     handlers: {
       'addComment': 'addComment'
     },
@@ -61,25 +52,16 @@ angular.module('app', ['flux'])
       this.comments.push(comment);
       this.emitChange();
     },
-
-    // Getters
     exports: {
-
-      // Traditional getter
-      getComments: function () {
-        return this.comments;
+      getLatestComment: function () {
+        return this.comments[this.comments.length - 1];
       },
-
-      // A getter getter :-)
       get comments() {
         return this.comments;
       }
     }
-
   };
-
 })
-// You can also use a factory
 .factory('Stores', function (flux) {
   return {
     'StoreA': flux.createStore('StoreA', {}),
@@ -87,48 +69,152 @@ angular.module('app', ['flux'])
   }
 });
 ```
-A store in flux-angular works just like the **Yahoo Dispatchr**, it IS the Yahoo Dispatchr. The only difference is an extra property called **exports**. So **exports** and **handlers** are special properties. **handlers** is an object defining what dispatched actions to listen to and what method to run when that occurs. **exports** is an object defining methods to expose to controllers. The methods in the exports object is bound to the store. Any data returned by an export method is cloned. This keeps the store immutable. If you need to use an other export method inside an export method use **this.exports.myOtherExport()** to do so. That will not cause cloning. 
 
-## Dispatching actions and grabbing state from store
+## Grab state
 ```javascript
 angular.module('app', ['flux'])
-.controller('MyCtrl', function ($scope, MyStore, flux) {
-  
-  $scope.comment = '';
-
-  // $listenTo to listen to changes in store
+.controller('MyCtrl', function (MyStore, $scope) {
+  $scope.comments = MyStore.comments;
+  $scope.latestComment = MyStore.getLatestComment();
   $scope.$listenTo(MyStore, function () {
-    $scope.comments = MyStore.getComments();
-    // or
     $scope.comments = MyStore.comments;
+    $scope.latestComment = MyStore.getLatestComment();
   });
-
-  $scope.addComment = function () {
-    flux.dispatch('addComment', $scope.comment);
-    $scope.comment = '';
-  };
-
 });
 ```
-When a store runs the **emitChange** method any scopes listening to that store will trigger their callback, allowing them to update the $scope of the controller. You can also trigger specific events if you want to, with **emit('event')**.
+
+## Dispatch actions
+```javascript
+angular.module('app', ['flux'])
+.controller('MyCtrl', function (MyStore, $scope, flux) {
+  $scope.title = '';
+  $scope.addComment = function () {
+    flux.dispatch('addComment', $scope.title);
+    $scope.title = '';
+  };
+});
+```
+
+## Immutable mode
+
+### Configuration
+```javascript
+angular.module('app', ['flux'])
+.config(function (fluxProvider) {
+  fluxProvider.useCloning(false);
+});
+```
+
+### Create a store
+```javascript
+angular.module('app', ['flux'])
+.store('MyStore', function (flux) {
+  
+  var state = flux.immutable({
+    comments: []
+  });  
+
+  return {
+    handlers: {
+      'addComment': 'addComment'
+    },
+    addComment: function (comment) {
+      state = state.items.push(comment);
+      this.emitChange();
+    },
+    exports: {
+      getLatestComment: function () {
+        return state.comments[state.comments.length - 1];
+      },
+      get comments() {
+        return state.comments;
+      }
+    }
+  };
+});
+```
+**Note** that all mutations done to the immutable data structure will return a completely new data structure that needs to replace the old one. 
+
+### Mutations
+```javascript
+angular.module('app', ['flux'])
+.store('MyStore', function (flux) {
+  
+  var state = flux.immutable({
+    object: {},
+    array: []
+  });  
+
+  return {
+    handlers: {
+      'allMutations': 'allMutations'
+    },
+    allMutations: function (comment) {
+      state = state.object.set('foo', 'bar');
+      state = state.object.merge({something: 'else'});
+      state = state.array.push('foo');
+      state = state.array.splice(0, 1, 'bar');
+      state = state.array.pop();
+      state = state.array.concat(['something']);
+      state = state.array.shift();
+      state = state.array.unshift('else');
+    },
+    exports: {}
+  };
+});
+```
+
+### Two way databinding
+```javascript
+angular.module('app', ['flux'])
+.store('MyStore', function (flux) {
+  var state = flux.immutable({
+    person: {
+      name: 'Jane',
+      age: 30,
+      likes: 'awesome stuff'
+    }
+  });
+  return {
+    handlers: {
+      'savePerson': 'savePerson'
+    },
+    savePerson: function (updatedPerson) {
+      state = state.person.merge(updatedPerson);
+      this.emitChange();
+    }
+  };
+})
+.controller('MyCtrl', function (MyStore, $scope, flux) {
+  $scope.person = MyStore.person.toJS();
+  $scope.savePerson = function () {
+    flux.dispatch('savePerson', $scope.person);
+  };
+  $scope.$listenTo(MyStore, function () {
+    $scope.person = MyStore.person.toJS();
+  });
+});
+```
+By using the `.toJS()` method we extract that state from the immutable object or array and allow Angular to update those values. We can then dispatch the updated values and merge them back into the immutable object.
+
 
 ### Event wildcards
-Due to Angulars dirtycheck you are given more control of how controllers and directives react to changes in the store. By using wildcards you can choose to listen to any event change in a store, within a specific state or a specific event. All the following listeners will trigger when MyStore runs **this.emit('comments.add')**:
+You can also trigger specific events in addition to `this.emitChange()`. Due to Angulars dirtycheck you are given more control of how controllers and directives react to changes in the store. By using wildcards you can choose to listen to any event change in a store, within a specific state or a specific event. All the following listeners will trigger when MyStore runs `this.emit('comments.add')`:
 
 ```javascript
 angular.module('app', ['flux'])
 .controller('MyCtrl', function ($scope, MyStore, flux) {
 
   $scope.$listenTo(MyStore, 'comments.add', function () {
-    $scope.comments = MyStore.getComments();
+    $scope.comments = MyStore.comments;
   });
 
   $scope.$listenTo(MyStore, 'comments.*', function () {
-    $scope.comments = MyStore.getComments();
+    $scope.comments = MyStore.comments;
   });
 
   $scope.$listenTo(MyStore, '*', function () {
-    $scope.comments = MyStore.getComments();
+    $scope.comments = MyStore.comments;
   });
 
 });
@@ -194,7 +280,7 @@ angular.module('app', ['flux'])
 ```
 
 ### Async operations
-It is not recommended to run async operations in your store handlers. The reason is that you would have a harder time testing and the **waitFor** method also requires the handlers to be synchronous. You solve this by having async services, also called **action creators**.
+It is not recommended to run async operations in your store handlers. The reason is that you would have a harder time testing and the **waitFor** method also requires the handlers to be synchronous. You solve this by having async services, also called **action creators** or **API adapters**.
 
 ```javascript
 angular.module('app', ['flux'])
@@ -224,57 +310,6 @@ angular.module('app', ['flux'])
 });
 ```
 
-### Get values from other stores
-If your application is structured in such a manner that you need to share state between stores you can create a shared state service:
-
-```javascript
-angular.module('app', ['flux'])
-.factory('AppState', function () {
-  return {
-    notifications: []
-  };
-})
-.store('CommentsStore', function (AppState) {
-  
-  return {
-    comments: [],
-    handlers: {
-      'addComment': 'addComment'
-    },
-    addComment: function (comment) {
-      this.waitFor('NotificationStore', function () {
-        comment.notificationId = AppState.notifications.length;
-        this.comments.push(comment);
-        this.emit('comments.add');
-      });
-    },
-    getComments: function () {
-      return this.comments;
-    }
-  };
-
-})
-.store('NotificationStore', function (AppState) {
-  
-  return {
-    handlers: {
-      'addComment': 'addNotification'
-    },
-    addNotification: function (comment) {
-      AppState.notifications.push('Something happened');
-      comment.hasNotified = true;
-    },
-    exports: {
-      getNotifications: function () {
-        return AppState.notifications;
-      }
-    }
-  };
-
-});
-```
-If you first start to depend on stores directly you quickly get into circular dependency issues. You might consider putting all your state in a common AppState object that only the stores will inject.
-
 ### Testing stores
 When Angular Mock is loaded flux-angular will reset stores automatically.
 
@@ -294,11 +329,40 @@ describe('adding items', function () {
   }));
 
 });
-
 ```
 
 ### Performance
-Any $scopes listening to stores are removed when the $scope is destroyed. When it comes to cloning it only happens when you pull data out from a store. So an array of 10.000 items in the store is not a problem, because your application would probably not want to show all 10.000 items at any time. In this scenario your getter method probably does a filter, or a limit before returning the data.
+Any $scopes listening to stores are removed when the $scope is destroyed. When it comes to immutability mode against normal mode it is difficult to measure exactly how much benefit you get. It depends on the amount of data you have in your stores and how often you trigger changes. I would encourage running immutability mode as the API is pretty much the same and you should get a serious performance boost.
+
+### Changes
+**2.3.0**:
+  - Introducing immutable mode
+  - Exposed as a provider to allow configuration
+  - New **immutable()** method to create immutable data structures
+
+**2.2.0**:
+  - Fixed binding of export methods (thanks @Nihat)
+  - Fixed missing development deps
+  - Now supports getter functions in exports, cool stuff! (thanks @mlegenhausen)
+  - Added tests and updated documentation
+
+**2.1.2**:
+  - Cloning now keeps prototype of object, if not Object
+  - Stores are now pre-injected. This is to avoid confusion where you trigger dispatches in for example UI router (store is not yet injected)
+
+**2.1.1**:
+  - Callback only triggers on actual store event emitting now, not on initial registration
+
+**2.1.0**:
+  - Thanks to @SuperheroicCoding for great discussions!
+  - Refactored implementation
+  - Added tests
+  - flux.createStore to manually creates stores
+  - waitFor gives error if awaiting store is not injected
+
+**2.0.1**:
+  - Added automatic reset of stores during testing
+
 
 ### Run project
 1. `npm install`

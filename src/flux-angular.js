@@ -2,6 +2,7 @@
 
 // When requiring Angular it is added to global for some reason
 var angular = global.angular || require('angular') && global.angular;
+var ImmutableStore = require('immutable-store');
 
 // Dependencies
 var safeDeepClone = require('./safeDeepClone.js');
@@ -58,7 +59,7 @@ var createStore = function (name, spec, flux) {
 };
 
 // Flux Service is a wrapper for the Yahoo Dispatchr
-var FluxService = function () {
+var FluxService = function (useCloning) {
   this.stores = [];
   this.dispatcher = new Dispatchr();
 
@@ -93,12 +94,14 @@ var FluxService = function () {
           enumerable: descriptor.enumerable,
           configurable: descriptor.configurable,
           get: function () {
-            return safeDeepClone('[Circular]', [], descriptor.get.apply(storeInstance, arguments));
+            var value = descriptor.get.apply(storeInstance, arguments);
+            return useCloning ? safeDeepClone('[Circular]', [], value) : value;
           }
         });
       } else {
         store.exports[key] = function () {
-          return safeDeepClone('[Circular]', [], spec.exports[key].apply(storeInstance, arguments));
+          var value = spec.exports[key].apply(storeInstance, arguments);
+          return useCloning ? safeDeepClone('[Circular]', [], value) : value;
         };
         spec.exports[key] = spec.exports[key].bind(storeInstance);
       }
@@ -133,6 +136,10 @@ var FluxService = function () {
     Dispatchr.stores = {};
     Dispatchr.handlers = {};
     this.stores = [];
+  };
+
+  this.immutable = function (state) {
+    return new ImmutableStore(state);
   };
 
 };
@@ -172,7 +179,15 @@ angular.module = function () {
 };
 
 angular.module('flux', [])
-  .service('flux', FluxService)
+  .provider('flux', function FluxProvider () {
+    var cloning = true;
+    this.useCloning = function (useCloning) {
+      cloning = useCloning;
+    };
+    this.$get = [function fluxFactory () {
+      return new FluxService(cloning);
+    }];
+  })
   .run(['$rootScope', '$injector', 'flux', function ($rootScope, $injector, flux) {
 
     if (angular.mock) {

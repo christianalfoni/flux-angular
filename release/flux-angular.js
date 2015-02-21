@@ -4,6 +4,7 @@
 
 // When requiring Angular it is added to global for some reason
 var angular = global.angular || require('angular') && global.angular;
+var ImmutableStore = require('immutable-store');
 
 // Dependencies
 var safeDeepClone = require('./safeDeepClone.js');
@@ -60,7 +61,7 @@ var createStore = function (name, spec, flux) {
 };
 
 // Flux Service is a wrapper for the Yahoo Dispatchr
-var FluxService = function () {
+var FluxService = function (useCloning) {
   this.stores = [];
   this.dispatcher = new Dispatchr();
 
@@ -95,12 +96,14 @@ var FluxService = function () {
           enumerable: descriptor.enumerable,
           configurable: descriptor.configurable,
           get: function () {
-            return safeDeepClone('[Circular]', [], descriptor.get.apply(storeInstance, arguments));
+            var value = descriptor.get.apply(storeInstance, arguments);
+            return useCloning ? safeDeepClone('[Circular]', [], value) : value;
           }
         });
       } else {
         store.exports[key] = function () {
-          return safeDeepClone('[Circular]', [], spec.exports[key].apply(storeInstance, arguments));
+          var value = spec.exports[key].apply(storeInstance, arguments);
+          return useCloning ? safeDeepClone('[Circular]', [], value) : value;
         };
         spec.exports[key] = spec.exports[key].bind(storeInstance);
       }
@@ -135,6 +138,10 @@ var FluxService = function () {
     Dispatchr.stores = {};
     Dispatchr.handlers = {};
     this.stores = [];
+  };
+
+  this.immutable = function (state) {
+    return new ImmutableStore(state);
   };
 
 };
@@ -174,7 +181,15 @@ angular.module = function () {
 };
 
 angular.module('flux', [])
-  .service('flux', FluxService)
+  .provider('flux', function FluxProvider () {
+    var cloning = true;
+    this.useCloning = function (useCloning) {
+      cloning = useCloning;
+    };
+    this.$get = [function fluxFactory () {
+      return new FluxService(cloning);
+    }];
+  })
   .run(['$rootScope', '$injector', 'flux', function ($rootScope, $injector, flux) {
 
     if (angular.mock) {
@@ -213,7 +228,7 @@ angular.module('flux', [])
   }]);
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./safeDeepClone.js":9,"angular":"angular","dispatchr":2,"eventemitter2":8}],2:[function(require,module,exports){
+},{"./safeDeepClone.js":13,"angular":"angular","dispatchr":2,"eventemitter2":8,"immutable-store":9}],2:[function(require,module,exports){
 /**
  * Copyright 2014, Yahoo! Inc.
  * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
@@ -1616,6 +1631,322 @@ function plural(ms, n, name) {
 }();
 
 },{}],9:[function(require,module,exports){
+'use strict';
+var StoreArray = require('./StoreArray.js');
+var StoreObject = require('./StoreObject.js');
+
+var unfreeze = function (value, helpers) {
+  if (Array.isArray(value)) {
+    return StoreArray(value, helpers);
+  } else if (typeof value === 'object' && value !== null) {
+    return StoreObject(value, helpers);
+  } else {
+    return value;
+  }
+};
+
+var traverse = function (helpers, value) {
+  if (Array.isArray(value) && !value.__) {
+    var array = value.map(function (item, index) {
+      helpers.currentPath.push(index);
+      var obj = traverse(helpers, item);
+      helpers.currentPath.pop();
+      return obj;
+    });
+    var storeArray = StoreArray(array, helpers);
+    Object.freeze(storeArray);
+    return storeArray;
+  } else if (typeof value === 'object' && value !== null && !value.__) {
+    var object = Object.keys(value).reduce(function (object, key) {
+      helpers.currentPath.push(key);
+      object[key] = traverse(helpers, value[key]);
+      helpers.currentPath.pop();
+      return object;
+    }, {});
+    var storeObject = StoreObject(object, helpers);
+    Object.freeze(storeObject);
+    return storeObject;
+  } else {
+    return value;
+  }
+};
+
+var updatePath = function (helpers, path, cb) {
+
+  helpers.currentPath = [];
+
+  // Unfreeze the store, ready for traversal
+  var newStore = unfreeze(helpers.currentStore, helpers);
+  var destination = newStore;
+
+  // Go through path in need of update and unfreeze along the
+  // way to update any props
+  path.forEach(function (pathKey) {
+    helpers.currentPath.push(pathKey);
+    destination[pathKey] = unfreeze(destination[pathKey], helpers);
+    destination = destination[pathKey];
+  });
+
+  // Run the update
+  cb(destination, helpers, traverse);
+
+  // Get ready for new traversal to freeze all
+  // paths
+  destination = newStore;
+  path.forEach(function (pathKey) {
+    destination = destination[pathKey];
+    Object.freeze(destination);
+  });
+
+  // Make ready a new store with its special
+  // domain getters, then freeze it
+  var store = {};
+  Object.keys(newStore).forEach(function (key) {
+    Object.defineProperty(store, key, {
+      enumerable: true,
+      get: function () {
+        helpers.currentStore = this;
+        return newStore[key];
+      }
+    });
+  });
+  Object.freeze(store);
+
+  return store;
+};
+
+var createStore = function (helpers, state) {
+  var store = {};
+  Object.keys(state).forEach(function (key) {
+    helpers.currentPath.push(key);
+    var branch = traverse(helpers, state[key]);
+    helpers.currentPath.pop(key);
+    Object.defineProperty(store, key, {
+      enumerable: true,
+      get: function () {
+        helpers.currentStore = this;
+        return branch;
+      }
+    });
+  });
+  Object.freeze(store);
+  return store;
+};
+
+function Store(state) {
+
+  if (!state || (typeof state !== 'object' || Array.isArray(state) || state === null)) {
+    throw new Error('You have to pass an object to the store');
+  }
+
+  var helpers = {
+    currentPath: [],
+    currentStore: null,
+    update: function (path, cb) {
+      helpers.currentStore = updatePath(helpers, path, cb);
+      return helpers.currentStore;
+    }
+  };
+
+  helpers.currentStore = createStore(helpers, state);
+  return helpers.currentStore;
+
+}
+
+module.exports = Store;
+
+},{"./StoreArray.js":10,"./StoreObject.js":11}],10:[function(require,module,exports){
+'use strict';
+var utils = require('./utils.js');
+var StoreArray = function () {
+
+  function StoreArray(items) {
+    var inst = Array.apply(Array, items);
+    inst.__proto__ = StoreArray.prototype;
+    return inst;
+  }
+  StoreArray.prototype = Object.create(Array.prototype);
+  StoreArray.prototype.push = function (item) {
+    return this.__.update(this.__.path, function (obj, helpers, traverse) {
+      helpers.currentPath.push(obj.length);
+      Array.prototype.push.call(obj, traverse(helpers, item));
+    });
+  };
+  StoreArray.prototype.splice = function () {
+    var args = [].slice.call(arguments, 0);
+    var startIndex = args.shift();
+    var count = args.shift();
+    return this.__.update(this.__.path, function (obj, helpers, traverse) {
+
+      var additions = args.map(function (arg, index) {
+        helpers.currentPath.push(startIndex + index);
+        var addition = traverse(helpers, arg);
+        helpers.currentPath.pop();
+        return addition;
+      });
+
+      Array.prototype.splice.apply(obj, [startIndex, count].concat(additions));
+
+      // Update paths
+      for (var x = startIndex; x < obj.length; x++) {
+        if (obj[x].__) {
+          var path = obj[x].__.path;
+          path[path.length - 1] = x;
+        }
+      }
+
+    });
+  };
+  StoreArray.prototype.concat = function () {
+    var args = [].slice.call(arguments, 0);
+    return this.__.update(this.__.path, function (obj, helpers, traverse) {
+      args.map(function (arg) {
+        if (Array.isArray(arg)) {
+          arg.map(function (deepArg) {
+            helpers.currentPath.push(obj.length);
+            Array.prototype.push.call(obj, traverse(helpers, deepArg));
+            helpers.currentPath.pop();
+          });
+        } else {
+          helpers.currentPath.push(obj.length);
+          Array.prototype.push.call(obj, traverse(helpers, arg));
+          helpers.currentPath.pop();
+        }
+      });
+    });
+  };
+  StoreArray.prototype.unshift = function (item) {
+    return this.__.update(this.__.path, function (obj, helpers, traverse) {
+      Array.prototype.unshift.call(obj, traverse(helpers, item));
+
+      // Update paths
+      for (var x = 0; x < obj.length; x++) {
+        if (obj[x].__) {
+          var path = obj[x].__.path;
+          path[path.length - 1] = x;
+        }
+      }
+
+    });
+  };
+  StoreArray.prototype.shift = function (item) {
+    return this.__.update(this.__.path, function (obj, helpers, traverse) {
+      Array.prototype.shift.call(obj, traverse(helpers, item));
+
+      // Update paths
+      for (var x = 0; x < obj.length; x++) {
+        if (obj[x].__) {
+          var path = obj[x].__.path;
+          path[path.length - 1] = x;
+        }
+      }
+
+    });
+  };
+  StoreArray.prototype.pop = function () {
+    return this.__.update(this.__.path, function (obj) {
+      Array.prototype.pop.call(obj);
+    });
+  };
+  StoreArray.prototype.toJS = function () {
+    return utils.toJS(this);
+  };
+
+  return function (items, helpers) {
+    var array = new StoreArray(items);
+    Object.defineProperty(array, '__', {
+      value: {
+        path: helpers.currentPath.slice(0),
+        update: helpers.update
+      }
+    });
+    return array;
+  };
+
+};
+
+module.exports = StoreArray();
+
+},{"./utils.js":12}],11:[function(require,module,exports){
+'use strict';
+var utils = require('./utils.js');
+var StoreObject = function () {
+
+  var StoreObjectProto = {
+    set: function (key, value) {
+      return this.__.update(this.__.path, function (obj, helpers, traverse) {
+
+        // If an array is set there might be immutable objects in it that needs
+        // a path update
+        if (Array.isArray(value)) {
+          value.forEach(function (item, index) {
+            if (item.__) {
+              item.__.path[item.__.path.length - 1] = index;
+            }
+          });
+        }
+        helpers.currentPath.push(key);
+        obj[key] = traverse(helpers, value);
+        helpers.currentPath.pop();
+      });
+    },
+    toJS: function () {
+      return utils.toJS(this);
+    },
+    merge: function (mergeObj) {
+      if (Array.isArray(mergeObj) || typeof mergeObj !== 'object' || mergeObj === null) {
+        throw new Error('You have to pass an object to the merge method');
+      }
+      return this.__.update(this.__.path, function (obj, helpers, traverse) {
+        Object.keys(mergeObj).forEach(function (key) {
+          helpers.currentPath.push(key);
+          obj[key] = traverse(helpers, mergeObj[key]);
+          helpers.currentPath.pop();
+        });
+      });
+    }
+  };
+
+  return function (props, helpers) {
+    var object = Object.create(StoreObjectProto);
+    Object.keys(props).forEach(function (key) {
+      object[key] = props[key];
+    });
+    Object.defineProperty(object, '__', {
+      value: {
+        path: helpers.currentPath.slice(0),
+        update: helpers.update
+      }
+    });
+    return object;
+  };
+
+};
+
+module.exports = StoreObject();
+
+},{"./utils.js":12}],12:[function(require,module,exports){
+"use strict";
+var utils = {
+  toJS: function (obj) {
+    if (obj instanceof Array) {
+      return obj.map(function (obj) {
+        return utils.toJS(obj);
+      });
+    } else if (typeof obj === 'object' && obj !== null) {
+      return Object.keys(obj).reduce(function (newObj, key) {
+        newObj[key] = utils.toJS(obj[key]);
+        return newObj;
+      }, {});
+    } else {
+      return obj;
+    }
+  }
+};
+
+module.exports = utils;
+
+},{}],13:[function(require,module,exports){
 /* global Blob */
 /* global File */
 
