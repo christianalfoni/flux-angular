@@ -1727,8 +1727,8 @@ var updatePath = function (helpers, path, cb) {
     Object.freeze(destination);
   });
 
-  // Make ready a new store with its special
-  // domain getters, then freeze it
+  // Make ready a new store and freeze it
+      helpers.currentPath.pop();
   var store = StoreObject(newStore, helpers);
   Object.keys(newStore).forEach(function (key) {
     Object.defineProperty(store, key, {
@@ -1740,7 +1740,6 @@ var updatePath = function (helpers, path, cb) {
     });
   });
   Object.freeze(store);
-
   return store;
 };
 
@@ -1790,7 +1789,8 @@ var utils = require('./utils.js');
 var StoreArray = function () {
 
   function StoreArray(items) {
-    var inst = Array.apply(Array, items);
+    var inst = Array.apply(Array);
+    inst = inst.concat(items);
     inst.__proto__ = StoreArray.prototype;
     return inst;
   }
@@ -1799,6 +1799,7 @@ var StoreArray = function () {
     return this.__.update(this.__.path, function (obj, helpers, traverse) {
       helpers.currentPath.push(obj.length);
       Array.prototype.push.call(obj, traverse(helpers, item));
+      helpers.currentPath.pop();
     });
   };
   StoreArray.prototype.splice = function () {
