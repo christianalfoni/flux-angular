@@ -96,18 +96,20 @@ angular.module('app', ['flux'])
 ```
 
 ## Immutable mode
-If you're new to the idea of immutable data then you may be interested in [this video](https://www.youtube.com/watch?v=I7IdS-PbEgI) from React.js conf which explains the theory and benefits.  The big benefits are:
-* Faster reads because of the lack of deep cloning.
-* Less renders and `$scope.$watch` triggers because the reference to the object doesn't change unless the object changes.
+If you're new to the idea of immutable data then you may be interested in [this video](https://www.youtube.com/watch?v=I7IdS-PbEgI) from React.js conf which explains the theory and benefits.
 
-Downsides and caveats:
-* Need to use the immutable API for changing state (see below).
+On the bright side:
+* Faster reads because there is no deep cloning
+* Less renders and `$scope.$watch` triggers because the reference to the object doesn't change unless the object changes
+
+On the not so bright side:
+* Need to use a slightly more verbose API for changing state (see below).
 * Slightly slower writes
 * `ng-repeat` with immutable objects need to use the `track by` option. Otherwise angular will fail, complaining it can't add the `$$hashKey` variable to the collection items.
 * If your directive/controller does need to modify the immutable object (e.g. for use with `ng-model`) you must use the `toJS()` method when pulling it out of the store.  However, note that primitives are always copied so they don't need `toJS()`.
 
 ### Configuration
-To use real immutable objects in your stores rather than relying on flux-angular wrapping all your exports in a deep clone operation then your application must opt-in to immutability mode:
+To use real immutable objects in your stores, rather than relying on deep clone operations, your application must opt-in to immutability mode by turning off the cloning:
 
 ```javascript
 angular.module('app', ['flux'])
