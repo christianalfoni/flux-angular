@@ -108,6 +108,9 @@ On the not so bright side:
 * `ng-repeat` with immutable objects need to use the `track by` option. Otherwise angular will fail, complaining it can't add the `$$hashKey` variable to the collection items.
 * If your directive/controller does need to modify the immutable object (e.g. for use with `ng-model`) you must use the `toJS()` method when pulling it out of the store.  However, note that primitives are always copied so they don't need `toJS()`.
 
+Conclusion:
+**It is faster, but a bit more verbose!**
+
 ### Configuration
 To use real immutable objects in your stores, rather than relying on deep clone operations, your application must opt-in to immutability mode by turning off the cloning:
 
