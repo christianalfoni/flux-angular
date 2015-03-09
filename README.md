@@ -335,6 +335,9 @@ describe('adding items', function () {
 Any $scopes listening to stores are removed when the $scope is destroyed. When it comes to immutability mode against normal mode it is difficult to measure exactly how much benefit you get. It depends on the amount of data you have in your stores and how often you trigger changes. I would encourage running immutability mode as the API is pretty much the same and you should get a serious performance boost.
 
 ### Changes
+**2.3.2**
+  - Added new version of immutable-store, a couple of more bug fixes
+
 **2.3.1**
   - Added new version of immutable-store, where "set" bug is fixed
 
