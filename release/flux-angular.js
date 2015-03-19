@@ -1719,16 +1719,15 @@ var updatePath = function (helpers, path, cb) {
   // Run the update
   cb(destination, helpers, traverse);
 
-  // Get ready for new traversal to freeze all
-  // paths
+  // Get ready for new traversal to freeze all paths
   destination = newStore;
   path.forEach(function (pathKey) {
     destination = destination[pathKey];
     Object.freeze(destination);
+    helpers.currentPath.pop();
   });
 
   // Make ready a new store and freeze it
-      helpers.currentPath.pop();
   var store = StoreObject(newStore, helpers);
   Object.keys(newStore).forEach(function (key) {
     Object.defineProperty(store, key, {

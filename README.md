@@ -8,9 +8,10 @@ The API of flux-angular is really starting to shape up, but there is still one c
 
 - [Features](#Features)
 - [Concept](#Concept)
+- [Releases](releases)
 - [FAQ](#FAQ)
 - [Create a store](#Create-a-store)
-- [Grab state](#Grab-state)
+- [Create a component](#Create-a-component)
 - [Dispatch actions](#Dispatch-actions)
 - [Immutable mode](#Immutable-mode)
 - [Event wildcards](#Event-wildcards)
@@ -19,7 +20,6 @@ The API of flux-angular is really starting to shape up, but there is still one c
 - [Async operations](#Async-operations)
 - [Testing stores](#Testing-stores)
 - [Performance](#Performance)
-- [Changes](#Changes)
 - [Run project](#Run-project)
 
 
@@ -70,27 +70,46 @@ angular.module('app', ['flux'])
 });
 ```
 
-## Grab state
+## Create a component
+As suggested by egghead.io, [read more here](http://blog.ninja-squad.com/2014/12/15/what-is-coming-in-angularjs-1.4/), you should use directives in the following format. Forget about controllers as they will be removed in Angular 2.0.
 ```javascript
 angular.module('app', ['flux'])
-.controller('MyCtrl', function (MyStore, $scope) {
-  $scope.comments = MyStore.comments;
-  $scope.latestComment = MyStore.getLatestComment();
-  $scope.$listenTo(MyStore, function () {
-    $scope.comments = MyStore.comments;
-    $scope.latestComment = MyStore.getLatestComment();
-  });
+.directive ('myComponent', function () {
+  return {
+    controllerAs: 'myComponent',
+    scope: {},
+    templateUrl: 'myComponent.html',
+    controller: function ($scope, MyStore) {
+
+      $scope.comments = MyStore.comments;
+      $scope.latestComment = MyStore.getLatestComment();
+      $scope.$listenTo(MyStore, function () {
+        $scope.comments = MyStore.comments;
+        $scope.latestComment = MyStore.getLatestComment();
+      });
+
+    }
+  };
 });
 ```
 
 ## Dispatch actions
 ```javascript
 angular.module('app', ['flux'])
-.controller('MyCtrl', function (MyStore, $scope, flux) {
-  $scope.title = '';
-  $scope.addComment = function () {
-    flux.dispatch('addComment', $scope.title);
-    $scope.title = '';
+.directive ('myComponent', function () {
+  return {
+    controllerAs: 'myComponent',
+    scope: {},
+    templateUrl: 'myComponent.html',
+    controller: function ($scope, MyStore, flux) {
+
+      $scope.title = '';
+      $scope.addComment = function () {
+        flux.dispatch('addComment', $scope.title);
+        $scope.title = '';
+      };
+
+    }
   };
 });
 ```
@@ -111,7 +130,7 @@ On the not so bright side:
 Conclusion:
 **It is faster, but a bit more verbose!**
 
-### Configuration
+#### Configuration
 To use real immutable objects in your stores, rather than relying on deep clone operations, your application must opt-in to immutability mode by turning off the cloning:
 
 ```javascript
@@ -121,7 +140,7 @@ angular.module('app', ['flux'])
 });
 ```
 
-### Create a store
+#### Create a store
 ```javascript
 angular.module('app', ['flux'])
 .store('MyStore', function (flux) {
@@ -151,7 +170,7 @@ angular.module('app', ['flux'])
 ```
 **Note** that all mutations done to the immutable data structure will return a completely new data structure that needs to replace the old one. 
 
-### Mutations
+#### Mutations
 ```javascript
 angular.module('app', ['flux'])
 .store('MyStore', function (flux) {
@@ -182,7 +201,7 @@ angular.module('app', ['flux'])
 });
 ```
 
-### Two way databinding
+#### Two way databinding
 ```javascript
 angular.module('app', ['flux'])
 .store('MyStore', function (flux) {
@@ -203,14 +222,23 @@ angular.module('app', ['flux'])
     }
   };
 })
-.controller('MyCtrl', function (MyStore, $scope, flux) {
-  $scope.person = MyStore.person.toJS();
-  $scope.savePerson = function () {
-    flux.dispatch('savePerson', $scope.person);
+.directive ('myComponent', function () {
+  return {
+    controllerAs: 'myComponent',
+    scope: {},
+    templateUrl: 'myComponent.html',
+    controller: function ($scope, MyStore, flux) {
+
+      $scope.person = MyStore.person.toJS();
+      $scope.savePerson = function () {
+        flux.dispatch('savePerson', $scope.person);
+      };
+      $scope.$listenTo(MyStore, function () {
+        $scope.person = MyStore.person.toJS();
+      });
+
+    }
   };
-  $scope.$listenTo(MyStore, function () {
-    $scope.person = MyStore.person.toJS();
-  });
 });
 ```
 By using the `.toJS()` method we extract that state from the immutable object or array and allow Angular to update those values. We can then dispatch the updated values and merge them back into the immutable object.
@@ -221,20 +249,27 @@ You can also trigger specific events in addition to `this.emitChange()`. Due to 
 
 ```javascript
 angular.module('app', ['flux'])
-.controller('MyCtrl', function ($scope, MyStore, flux) {
+.directive ('myComponent', function () {
+  return {
+    controllerAs: 'myComponent',
+    scope: {},
+    templateUrl: 'myComponent.html',
+    controller: function ($scope, MyStore, flux) {
 
-  $scope.$listenTo(MyStore, 'comments.add', function () {
-    $scope.comments = MyStore.comments;
-  });
+      $scope.$listenTo(MyStore, 'comments.add', function () {
+        $scope.comments = MyStore.comments;
+      });
 
-  $scope.$listenTo(MyStore, 'comments.*', function () {
-    $scope.comments = MyStore.comments;
-  });
+      $scope.$listenTo(MyStore, 'comments.*', function () {
+        $scope.comments = MyStore.comments;
+      });
 
-  $scope.$listenTo(MyStore, '*', function () {
-    $scope.comments = MyStore.comments;
-  });
+      $scope.$listenTo(MyStore, '*', function () {
+        $scope.comments = MyStore.comments;
+      });
 
+    }
+  };
 });
 ```
 
@@ -321,11 +356,6 @@ angular.module('app', ['flux'])
     }
   };
 })
-.controller('MyCtrl', function (CommentActions) {
-  $scope.addComment = function () {
-    CommentActions.addComment({content: 'foo'});
-  };
-});
 ```
 
 ### Testing stores
@@ -351,42 +381,6 @@ describe('adding items', function () {
 
 ### Performance
 Any $scopes listening to stores are removed when the $scope is destroyed. When it comes to immutability mode against normal mode it is difficult to measure exactly how much benefit you get. It depends on the amount of data you have in your stores and how often you trigger changes. I would encourage running immutability mode as the API is pretty much the same and you should get a serious performance boost.
-
-### Changes
-**2.3.2**
-  - Added new version of immutable-store, a couple of more bug fixes
-
-**2.3.1**
-  - Added new version of immutable-store, where "set" bug is fixed
-
-**2.3.0**:
-  - Introducing immutable mode
-  - Exposed as a provider to allow configuration
-  - New **immutable()** method to create immutable data structures
-
-**2.2.0**:
-  - Fixed binding of export methods (thanks @Nihat)
-  - Fixed missing development deps
-  - Now supports getter functions in exports, cool stuff! (thanks @mlegenhausen)
-  - Added tests and updated documentation
-
-**2.1.2**:
-  - Cloning now keeps prototype of object, if not Object
-  - Stores are now pre-injected. This is to avoid confusion where you trigger dispatches in for example UI router (store is not yet injected)
-
-**2.1.1**:
-  - Callback only triggers on actual store event emitting now, not on initial registration
-
-**2.1.0**:
-  - Thanks to @SuperheroicCoding for great discussions!
-  - Refactored implementation
-  - Added tests
-  - flux.createStore to manually creates stores
-  - waitFor gives error if awaiting store is not injected
-
-**2.0.1**:
-  - Added automatic reset of stores during testing
-
 
 ### Run project
 1. `npm install`
