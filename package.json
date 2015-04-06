@@ -2,7 +2,7 @@
   "name": "flux-angular",
   "version": "2.3.3",
   "description": "A FLUX architecture for Angular JS",
-  "main": "./src/main.js",
+  "main": "./src/flux-angular.js",
   "scripts": {
     "test": "./node_modules/karma/bin/karma start karma.conf.js",
     "start": "gulp",
