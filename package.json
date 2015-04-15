@@ -1,6 +1,6 @@
 {
   "name": "flux-angular",
-  "version": "2.3.3",
+  "version": "2.3.4",
   "description": "A FLUX architecture for Angular JS",
   "main": "./src/flux-angular.js",
   "scripts": {

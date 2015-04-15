@@ -1,6 +1,4 @@
-/* global Blob */
-/* global File */
-
+var angular = global.angular || require('angular') && global.angular;
 function safeDeepClone(circularValue, refs, obj) {
   var copy;
 
@@ -15,7 +13,7 @@ function safeDeepClone(circularValue, refs, obj) {
   }
 
   // Handle Array - or array-like items
-  if (obj instanceof Array || obj.length) {
+  if (angular.isArray(obj)) {
     
     refs.push(obj);
     copy = [];
