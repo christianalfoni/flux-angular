@@ -326,7 +326,9 @@ Action.prototype.waitFor = function waitFor(stores, callback) {
     debug('waiting on ' + stores.join(', '));
     stores.forEach(function storesEach(storeName) {
         storeName = self.getStoreName(storeName);
-        self._callHandler(storeName);
+        if (self._handlers[storeName]) {
+            self._callHandler(storeName);
+        }
     });
 
     callback();
@@ -484,6 +486,10 @@ module.exports = function () {
      * @throws {Error} if store has handler registered that does not exist
      */
     Dispatcher.prototype.dispatch = function dispatch(actionName, payload) {
+        if (!actionName) {
+            throw new Error('actionName parameter `' + actionName + '` is invalid.');
+        }
+
         if (this.currentAction) {
             throw new Error('Cannot call dispatch while another dispatch is executing. Attempted to execute \'' + actionName + '\' but \'' + this.currentAction.name + '\' is already executing.');
         }
@@ -1976,9 +1982,8 @@ var utils = {
 module.exports = utils;
 
 },{}],13:[function(require,module,exports){
-/* global Blob */
-/* global File */
-
+(function (global){
+var angular = global.angular || require('angular') && global.angular;
 function safeDeepClone(circularValue, refs, obj) {
   var copy;
 
@@ -1993,7 +1998,7 @@ function safeDeepClone(circularValue, refs, obj) {
   }
 
   // Handle Array - or array-like items
-  if (obj instanceof Array || obj.length) {
+  if (angular.isArray(obj)) {
     
     refs.push(obj);
     copy = [];
@@ -2033,5 +2038,6 @@ function safeDeepClone(circularValue, refs, obj) {
 
 module.exports = safeDeepClone;
 
-},{}]},{},[1])(1)
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"angular":"angular"}]},{},[1])(1)
 });
