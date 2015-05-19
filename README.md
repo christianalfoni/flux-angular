@@ -219,6 +219,11 @@ angular.module('app', ['flux'])
     savePerson: function (updatedPerson) {
       state = state.person.merge(updatedPerson);
       this.emitChange();
+    },
+    exports: {
+      get person() {
+        return state.person;
+      }
     }
   };
 })
