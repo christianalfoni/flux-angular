@@ -11,6 +11,7 @@ The API of flux-angular is really starting to shape up, but there is still one c
 - [Releases](releases)
 - [FAQ](#FAQ)
 - [Create a store](#Create-a-store)
+- [Configure max listeners](#configure-max-listeners)
 - [Create a component](#Create-a-component)
 - [Dispatch actions](#Dispatch-actions)
 - [Immutable mode](#Immutable-mode)
@@ -69,6 +70,25 @@ angular.module('app', ['flux'])
   }
 });
 ```
+
+## Configure max listeners
+Flux-Angular uses EventEmitter2 which has a failsafe to warn about possible memory leaks. If you are building a large application you might have to increase the number of event listeners allowed globally or on each store.
+```javascript
+angular.module('app', ['flux'])
+.config(function (fluxProvider) {
+  
+  // Globally
+  fluxProvider.setMaxListeners(20); 
+  
+  // Or on each store
+  fluxProvider.setMaxListeners({
+    'MyStore': 5,
+    'MyOtherStore': 20
+  });
+
+});
+```
+
 
 ## Create a component
 As suggested by egghead.io, [read more here](http://blog.ninja-squad.com/2014/12/15/what-is-coming-in-angularjs-1.4/), you should use directives in the following format. Forget about controllers as they will be removed in Angular 2.0.

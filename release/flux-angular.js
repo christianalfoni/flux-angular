@@ -12,7 +12,7 @@ var Dispatchr = require('dispatchr')();
 var EventEmitter2 = require('eventemitter2').EventEmitter2;
 
 // A function that creates stores
-var createStore = function (name, spec, flux) {
+var createStore = function (name, spec, maxListeners, flux) {
 
   spec = spec || {};
 
@@ -33,6 +33,12 @@ var createStore = function (name, spec, flux) {
     EventEmitter2.call(this, {
       wildcard: true
     });
+
+    if (typeof maxListeners === 'number') {
+      this.setMaxListeners(maxListeners);
+    } else if (maxListeners && maxListeners[name]) {
+      this.setMaxListeners(maxListeners[name]);
+    }
 
     if (this.initialize) {
       this.initialize();
@@ -61,7 +67,7 @@ var createStore = function (name, spec, flux) {
 };
 
 // Flux Service is a wrapper for the Yahoo Dispatchr
-var FluxService = function (useCloning) {
+var FluxService = function (useCloning, maxListeners) {
   this.stores = [];
   this.dispatcher = new Dispatchr();
 
@@ -71,7 +77,7 @@ var FluxService = function (useCloning) {
 
   this.createStore = function (name, spec) {
 
-    var store = createStore(name, spec, this);
+    var store = createStore(name, spec, maxListeners, this);
     var storeInstance;
 
     // Create the exports object
@@ -183,11 +189,18 @@ angular.module = function () {
 angular.module('flux', [])
   .provider('flux', function FluxProvider () {
     var cloning = true;
+    var maxListeners = null;
+
     this.useCloning = function (useCloning) {
       cloning = useCloning;
     };
+
+    this.setMaxListeners = function (maxListenersDescription) {
+      maxListeners = maxListenersDescription;
+    };
+
     this.$get = [function fluxFactory () {
-      return new FluxService(cloning);
+      return new FluxService(cloning, maxListeners);
     }];
   })
   .run(['$rootScope', '$injector', 'flux', function ($rootScope, $injector, flux) {
@@ -215,7 +228,6 @@ angular.module('flux', [])
       var addMethod = eventName === '*' ? 'onAny' : 'on';
       var removeMethod = eventName === '*' ? 'offAny' : 'off';
       var args = eventName === '*' ? [callback] : [eventName, callback];
-
       store[addMethod].apply(store, args);
 
       // Remove any listeners to the store when scope is destroyed (GC)

@@ -1,24 +1,24 @@
-describe('FLUX-ANGULAR', function () {
+describe('FLUX-ANGULAR', function() {
 
-  describe('Using the store method', function () {
+  describe('Using the store method', function() {
 
-    beforeEach(function () {
+    beforeEach(function() {
 
       angular.module('test', ['flux'])
-        .store('MyStore', function () {
+        .store('MyStore', function() {
           return {
             items: [],
             handlers: {
               addItem: 'addItem'
             },
-            addItem: function (item) {
+            addItem: function(item) {
               this.items.push(item);
             },
             exports: {
-              getItems: function () {
+              getItems: function() {
                 return this.items;
               },
-              getFirstItem: function () {
+              getFirstItem: function() {
                 return this.exports.getItems()[0];
               },
               get items() {
@@ -32,71 +32,71 @@ describe('FLUX-ANGULAR', function () {
 
     });
 
-    it('should expose the exports object of the store', inject(function (MyStore) {
+    it('should expose the exports object of the store', inject(function(MyStore) {
       expect(MyStore.getItems).toBeDefined();
       expect(MyStore.items).toBeDefined();
     }));
 
-    it('should clone state values when exported', inject(function (MyStore, flux) {
+    it('should clone state values when exported', inject(function(MyStore, flux) {
       var store = flux.getStore(MyStore);
       expect(MyStore.getItems()).not.toBe(store.items);
       expect(MyStore.items).not.toBe(store.items);
     }));
 
-    it('should handle a dispatched message', inject(function (MyStore, flux) {
+    it('should handle a dispatched message', inject(function(MyStore, flux) {
       flux.dispatch('addItem', 'foo');
       expect(MyStore.getItems()[0]).toEqual('foo');
       expect(MyStore.items[0]).toEqual('foo');
     }));
 
-    it('should bind export methods to the store instance', inject(function (MyStore, flux) {
+    it('should bind export methods to the store instance', inject(function(MyStore, flux) {
       flux.dispatch('addItem', 'foo');
       expect(MyStore.getFirstItem()).toEqual('foo');
     }))
 
   });
 
-  describe('Waiting for other stores', function () {
+  describe('Waiting for other stores', function() {
 
-    beforeEach(function () {
+    beforeEach(function() {
 
       angular.module('test', ['flux'])
-        .store('StoreA', function () {
+        .store('StoreA', function() {
           return {
             items: [],
             handlers: {
               addItem: 'addItem',
               addItems: 'addItems'
             },
-            addItem: function (item) {
-              this.waitFor('StoreB', function () {
+            addItem: function(item) {
+              this.waitFor('StoreB', function() {
                 item.stores.push('StoreA');
                 this.items.push(item);
               });
             },
-            addItems: function (items) {
+            addItems: function(items) {
               this.items = this.items.concat(items);
             },
             exports: {
-              getItems: function () {
+              getItems: function() {
                 return this.items;
               }
             }
           };
         })
-        .store('StoreB', function () {
+        .store('StoreB', function() {
           return {
             items: [],
             handlers: {
               addItem: 'addItem',
               addItems: 'addItems'
             },
-            addItem: function (item) {
+            addItem: function(item) {
               item.stores.push('StoreB');
               this.items.push(item);
             },
-            addItems: function (items) {
-              this.waitFor(['StoreA'], function () {
+            addItems: function(items) {
+              this.waitFor(['StoreA'], function() {
                 this.items = this.items.concat(items);
               });
             },
@@ -108,45 +108,45 @@ describe('FLUX-ANGULAR', function () {
 
     });
 
-    it('should wait for other store defined to finish first', inject(function (StoreA, StoreB, flux) {
+    it('should wait for other store defined to finish first', inject(function(StoreA, StoreB, flux) {
       flux.dispatch('addItem', {
         stores: []
       });
       expect(StoreA.getItems()[0].stores).toEqual(['StoreB', 'StoreA']);
     }));
 
-    it('should be able to wait for stores using an array', inject(function (StoreA, StoreB, flux) {
+    it('should be able to wait for stores using an array', inject(function(StoreA, StoreB, flux) {
       flux.dispatch('addItems', ['foo']);
       expect(StoreA.getItems()).toEqual(['foo']);
     }));
 
-    it('should give error when store waited for is not injected', inject(function (StoreA, flux) {
+    it('should give error when store waited for is not injected', inject(function(StoreA, flux) {
       expect(flux.dispatch.bind(flux, 'addItem', 'foo')).toThrow();
     }));
 
   });
 
-  describe('Listening to events', function () {
+  describe('Listening to events', function() {
 
-    beforeEach(function () {
+    beforeEach(function() {
 
       angular.module('test', ['flux'])
-        .factory('MyStore', function (flux) {
+        .factory('MyStore', function(flux) {
           return flux.createStore('MyStore', {
             items: [],
             handlers: {
               addItem: 'addItem',
               triggerEvent: 'triggerEvent'
             },
-            addItem: function (item) {
+            addItem: function(item) {
               this.items.push(item);
               this.emitChange();
             },
-            triggerEvent: function () {
+            triggerEvent: function() {
               this.emit('event');
             },
             exports: {
-              getItems: function () {
+              getItems: function() {
                 return this.items;
               }
             }
@@ -157,12 +157,12 @@ describe('FLUX-ANGULAR', function () {
 
     });
 
-    it('should have a $listenTo method', inject(function (MyStore, $rootScope) {
+    it('should have a $listenTo method', inject(function(MyStore, $rootScope) {
       var $scope = $rootScope.$new();
       expect($scope.$listenTo).toBeDefined();
     }));
 
-    it('should call the callback when change event is emitted', inject(function (MyStore, $rootScope, flux) {
+    it('should call the callback when change event is emitted', inject(function(MyStore, $rootScope, flux) {
       var $scope = $rootScope.$new();
       var cb = jasmine.createSpy('callback');
       $scope.$listenTo(MyStore, cb);
@@ -170,7 +170,7 @@ describe('FLUX-ANGULAR', function () {
       expect(cb.calls.count()).toEqual(1);
     }));
 
-    it('should call the callback if specific event is listened to and emitted', inject(function (MyStore, $rootScope, flux) {
+    it('should call the callback if specific event is listened to and emitted', inject(function(MyStore, $rootScope, flux) {
       var $scope = $rootScope.$new();
       var cb = jasmine.createSpy('callback');
       $scope.$listenTo(MyStore, 'event', cb);
@@ -178,11 +178,18 @@ describe('FLUX-ANGULAR', function () {
       expect(cb.calls.count()).toEqual(1);
     }));
 
-    it('should keep the prototype of objects when retrieved from the store', inject(function (MyStore, $rootScope, flux) {
-      var MyObject = function () { this.foo = 'bar'; };
-      MyObject.prototype = {constructor: MyObject, getFoo: function () { return this.foo; }};
+    it('should keep the prototype of objects when retrieved from the store', inject(function(MyStore, $rootScope, flux) {
+      var MyObject = function() {
+        this.foo = 'bar';
+      };
+      MyObject.prototype = {
+        constructor: MyObject,
+        getFoo: function() {
+          return this.foo;
+        }
+      };
       var $scope = $rootScope.$new();
-      $scope.$listenTo(MyStore, function () {
+      $scope.$listenTo(MyStore, function() {
         expect(MyStore.getItems()[0].getFoo()).toEqual('bar');
       });
       flux.dispatch('addItem', new MyObject());
@@ -190,4 +197,91 @@ describe('FLUX-ANGULAR', function () {
 
   });
 
+  describe('Set max listeners with number', function() {
+
+    var maxListeners = 2;
+
+    beforeEach(function() {
+
+      angular.module('test', ['flux'])
+        .config(function(fluxProvider) {
+          fluxProvider.setMaxListeners(maxListeners);
+        })
+        .factory('MyStore', function(flux) {
+          return flux.createStore('MyStore', {
+            handlers: {},
+            exports: {}
+          });
+        });
+
+      module('test');
+
+    });
+
+    it('should be able to add the amount of listeners set by test, but not more', inject(function(MyStore, $rootScope, flux) {
+
+      var cb = jasmine.createSpy('callback');
+      var $scope = $rootScope.$new();
+      var error = console.error
+      console.error = function() {
+        cb();
+      };
+
+      $scope.$listenTo(MyStore, 'test', function() {});
+      $scope.$listenTo(MyStore, 'test', function() {});
+      $scope.$listenTo(MyStore, 'test', function() {});
+
+      expect(cb.calls.count()).toBe(1);
+
+      console.error = error;
+
+    }));
+
+  });
+
+  describe('Set max listeners with object', function() {
+
+    var maxListeners = 2;
+
+    beforeEach(function() {
+
+      angular.module('test', ['flux'])
+        .config(function(fluxProvider) {
+          fluxProvider.setMaxListeners({
+            'MyStore': 2
+          });
+        })
+        .factory('MyStore', function(flux) {
+          return flux.createStore('MyStore', {
+            handlers: {},
+            exports: {}
+          });
+        });
+
+      module('test');
+
+    });
+
+    it('should be able to add the amount of listeners set by test, but not more', inject(function(MyStore, $rootScope, flux) {
+
+      var cb = jasmine.createSpy('callback');
+      var $scope = $rootScope.$new();
+      var error = console.error
+      console.error = function() {
+        cb();
+      };
+
+      $scope.$listenTo(MyStore, 'test', function() {});
+      $scope.$listenTo(MyStore, 'test', function() {});
+      $scope.$listenTo(MyStore, 'test', function() {});
+
+      expect(cb.calls.count()).toBe(1);
+
+      console.error = error;
+
+    }));
+
+  });
+
 });
+
