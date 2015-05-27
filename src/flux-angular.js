@@ -34,7 +34,7 @@ var createStore = function (name, spec, maxListeners, flux) {
 
     if (typeof maxListeners === 'number') {
       this.setMaxListeners(maxListeners);
-    } else if (maxListeners && maxListeners[name]) {
+    } else if (maxListeners && typeof maxListeners[name] === 'number') {
       this.setMaxListeners(maxListeners[name]);
     }
 
