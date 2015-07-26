@@ -1,6 +1,6 @@
 {
   "name": "flux-angular",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "A FLUX architecture for Angular JS",
   "main": "./src/flux-angular.js",
   "scripts": {
@@ -34,6 +34,6 @@
     "dispatchr": "^0.2.8",
     "eventemitter2": "^0.4.14",
     "immutable": "^3.6.2",
-    "immutable-store": "^0.3.0"
+    "immutable-store": "^0.5.1"
   }
 }
