@@ -6,22 +6,22 @@ The API of flux-angular is really starting to shape up, but there is still one c
 
 [immutable-store](https://github.com/christianalfoni/immutable-store) is a separate project that solves this issue. Flux-angular can now be run in an immutable mode, where you create immutable data structures for the stores.
 
-- [Features](#Features)
-- [Concept](#Concept)
-- [Releases](releases)
-- [FAQ](#FAQ)
-- [Create a store](#Create-a-store)
+- [Features](#features)
+- [Concept](#concept)
+- [Releases](https://github.com/christianalfoni/flux-angular/releases)
+- [FAQ](#faq)
+- [Create a store](#create-a-store)
 - [Configure max listeners](#configure-max-listeners)
-- [Create a component](#Create-a-component)
-- [Dispatch actions](#Dispatch-actions)
-- [Immutable mode](#Immutable-mode)
-- [Event wildcards](#Event-wildcards)
-- [Wait for other stores to complete their handlers](#Wait-for-other-stores-to-complete-their-handlers)
-- [Lots of actions, use constants](#Lots-of-actions-use-constants)
-- [Async operations](#Async-operations)
-- [Testing stores](#Testing-stores)
-- [Performance](#Performance)
-- [Run project](#Run-project)
+- [Create a component](#create-a-component)
+- [Dispatch actions](#dispatch-actions)
+- [Immutable mode](#immutable-mode)
+- [Event wildcards](#event-wildcards)
+- [Wait for other stores to complete their handlers](#wait-for-other-stores-to-complete-their-handlers)
+- [Lots of actions, use constants](#lots-of-actions-use-constants)
+- [Async operations](#async-operations)
+- [Testing stores](#testing-stores)
+- [Performance](#performance)
+- [Run project](#run-project)
 
 
 ## Features
