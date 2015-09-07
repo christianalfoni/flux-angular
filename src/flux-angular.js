@@ -220,12 +220,17 @@ angular.module('flux', [])
         eventName = '*';
       }
 
-      callback = callback.bind(this);
+      var self = this;
+      var callbackWrapper = function() {
+        var args = [].slice.call(arguments);
+        self.dispatcherEvent = this.event;
+        callback.apply(self, args);
+      }
 
       var store = flux.getStore(storeExport);
       var addMethod = eventName === '*' ? 'onAny' : 'on';
       var removeMethod = eventName === '*' ? 'offAny' : 'off';
-      var args = eventName === '*' ? [callback] : [eventName, callback];
+      var args = eventName === '*' ? [callbackWrapper] : [eventName, callbackWrapper];
       store[addMethod].apply(store, args);
 
       // Remove any listeners to the store when scope is destroyed (GC)
