@@ -236,3 +236,5 @@ angular.module('flux', [])
     };
 
   }]);
+
+module.exports = 'flux';
