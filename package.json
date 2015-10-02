@@ -15,6 +15,7 @@
   "author": "Christian Alfoni",
   "license": "MIT",
   "devDependencies": {
+    "bower": "^1.5.3",
     "browserify": "^5.9.3",
     "glob": "^4.2.1",
     "gulp": "^3.8.11",
