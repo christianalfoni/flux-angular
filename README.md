@@ -1,5 +1,6 @@
 flux-angular
 ==========
+[![Gitter](https://badges.gitter.im/Join Chat.svg)](https://gitter.im/christianalfoni/flux-angular?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 ## Flux-Angular 2 now has immutability mode!
 The API of flux-angular is really starting to shape up, but there is still one challenge. To create a one way flow flux-angular clones data retrieved from the exports of a store. This has two performance hits. First of all it is a deep clone process, which can have a high cost on complex data structures. Second Angular will always see data retrieved from getters as a new value, even if it has not changed. This forces Angular to always do a new render, even though there was no need for it.
