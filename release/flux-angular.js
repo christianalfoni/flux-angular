@@ -11,6 +11,9 @@ var safeDeepClone = require('./safeDeepClone.js');
 var Dispatchr = require('dispatchr')();
 var EventEmitter2 = require('eventemitter2').EventEmitter2;
 
+var angularModule = angular.module;
+var stores = [];
+
 // A function that creates stores
 var createStore = function (name, spec, maxListeners, flux) {
 
@@ -36,7 +39,7 @@ var createStore = function (name, spec, maxListeners, flux) {
 
     if (typeof maxListeners === 'number') {
       this.setMaxListeners(maxListeners);
-    } else if (maxListeners && maxListeners[name]) {
+    } else if (maxListeners && typeof maxListeners[name] === 'number') {
       this.setMaxListeners(maxListeners[name]);
     }
 
@@ -72,6 +75,9 @@ var FluxService = function (useCloning, maxListeners) {
   this.dispatcher = new Dispatchr();
 
   this.dispatch = function () {
+    if (stores.length) {
+      console.warn("There are still stores not injected: " + stores.join(",") + ". Make sure to inject all stores before running any dispatches.");
+    }
     this.dispatcher.dispatch.apply(this.dispatcher, arguments);
   };
 
@@ -157,8 +163,6 @@ var FluxService = function (useCloning, maxListeners) {
 // Monkeypatch angular module (add .store)
 
 // Wrap "angular.module" to attach store method to module instance
-var angularModule = angular.module;
-var preInjectList = [];
 angular.module = function () {
 
   // Call the module as normaly and grab the instance
@@ -167,13 +171,14 @@ angular.module = function () {
   // Attach store method to instance
   moduleInstance.store = function (storeName, storeDefinition) {
 
-    // Add to preinject array
-    preInjectList.push(storeName);
+    // Add to stores array
+    stores.push(storeName);
 
     // Create a new store
     this.factory(storeName, ['$injector', 'flux', function ($injector, flux) {
 
       var storeConfig = $injector.invoke(storeDefinition);
+      stores.splice(stores.indexOf(storeName), 1);
       return flux.createStore(storeName, storeConfig);
 
     }]);
@@ -207,11 +212,6 @@ angular.module('flux', [])
 
     if (angular.mock) {
       flux.reset();
-    } else {
-
-      // Pre-inject all stores when not testing
-      $injector.invoke(preInjectList.concat(function () {}));
-
     }
 
     // Extend scopes with $listenTo
@@ -240,7 +240,7 @@ angular.module('flux', [])
   }]);
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./safeDeepClone.js":13,"angular":"angular","dispatchr":2,"eventemitter2":8,"immutable-store":9}],2:[function(require,module,exports){
+},{"./safeDeepClone.js":14,"angular":"angular","dispatchr":2,"eventemitter2":8,"immutable-store":10}],2:[function(require,module,exports){
 /**
  * Copyright 2014, Yahoo! Inc.
  * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
@@ -615,17 +615,10 @@ exports.formatArgs = formatArgs;
 exports.save = save;
 exports.load = load;
 exports.useColors = useColors;
-
-/**
- * Use chrome.storage.local if we are in an app
- */
-
-var storage;
-
-if (typeof chrome !== 'undefined' && typeof chrome.storage !== 'undefined')
-  storage = chrome.storage.local;
-else
-  storage = localstorage();
+exports.storage = 'undefined' != typeof chrome
+               && 'undefined' != typeof chrome.storage
+                  ? chrome.storage.local
+                  : localstorage();
 
 /**
  * Colors.
@@ -733,9 +726,9 @@ function log() {
 function save(namespaces) {
   try {
     if (null == namespaces) {
-      storage.removeItem('debug');
+      exports.storage.removeItem('debug');
     } else {
-      storage.debug = namespaces;
+      exports.storage.debug = namespaces;
     }
   } catch(e) {}
 }
@@ -750,7 +743,7 @@ function save(namespaces) {
 function load() {
   var r;
   try {
-    r = storage.debug;
+    r = exports.storage.debug;
   } catch(e) {}
   return r;
 }
@@ -1018,6 +1011,8 @@ module.exports = function(val, options){
  */
 
 function parse(str) {
+  str = '' + str;
+  if (str.length > 10000) return;
   var match = /^((?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(str);
   if (!match) return;
   var n = parseFloat(match[1]);
@@ -1678,9 +1673,83 @@ function plural(ms, n, name) {
 }();
 
 },{}],9:[function(require,module,exports){
+var utils = require('./utils.js');
+
+module.exports = function (helpers) {
+
+  return {
+    set: function (object, key, mapper, newStore) {
+
+      object.__.currentMapping[object.__.path.slice().concat(key).join('')] = utils.copyObject(mapper);
+
+      Object.keys(mapper.deps).forEach(function (dep) {
+        var pathString = mapper.deps[dep].join('');
+        helpers.depsOverview[pathString] = helpers.depsOverview[pathString] || [];
+        helpers.depsOverview[pathString].push(object);
+      });
+
+      var value = mapper.value;
+      var cachedGet = undefined;
+      var currentDeps = null;
+      var currentStore = helpers.currentStore;
+      var getDeps = function () {
+        return Object.keys(mapper.deps).reduce(function (deps, key) {
+          deps[key] = utils.getByPath(helpers.currentStore, mapper.deps[key]);
+          return deps;
+        }, {});
+      };
+      var hasChanged = function () {
+        var deps = getDeps();
+        return !utils.isSame(deps, currentDeps);
+      };
+      // Grab dep values and create a change checker.
+      // When getter runs decide if
+
+      Object.defineProperty(object, key, {
+        get: function () {
+
+          if (newStore) {
+            helpers.currentStore = newStore;
+          }
+
+          if (currentStore !== helpers.currentStore && currentDeps && hasChanged()) {
+            currentDeps = getDeps();
+            cachedGet = utils.makeImmutable(mapper.get(value, currentDeps));
+            return cachedGet;
+          }
+
+          if (currentDeps && hasChanged()) {
+            cachedGet = utils.makeImmutable(mapper.get(value, currentDeps));
+            return cachedGet;
+          } else if (currentDeps && cachedGet !== undefined) {
+            return cachedGet;
+          } else {
+            currentDeps = getDeps();
+            cachedGet = utils.makeImmutable(mapper.get(value, currentDeps));
+            return cachedGet;
+          }
+        },
+        set: function (newValue) {
+          value = newValue;
+          mapper.value = newValue;
+        },
+        enumerable: true,
+        configurable: true
+      });
+    },
+    get: function (object, key) {
+      return helpers.currentStore.__.currentMapping[object.__.path.slice().concat(key).join('')];
+    }
+  }
+
+};
+
+},{"./utils.js":13}],10:[function(require,module,exports){
 'use strict';
 var StoreArray = require('./StoreArray.js');
 var StoreObject = require('./StoreObject.js');
+var Mapper = require('./Mapper.js');
+var utils = require('./utils.js');
 
 var unfreeze = function (value, helpers) {
   if (Array.isArray(value)) {
@@ -1693,6 +1762,7 @@ var unfreeze = function (value, helpers) {
 };
 
 var traverse = function (helpers, value) {
+
   if (Array.isArray(value) && !value.__) {
     var array = value.map(function (item, index) {
       helpers.currentPath.push(index);
@@ -1718,9 +1788,15 @@ var traverse = function (helpers, value) {
   }
 };
 
-var updatePath = function (helpers, path, cb) {
+var updatePath = function (helpers, obj, cb) {
 
   helpers.currentPath = [];
+
+  var path = obj.__.path;
+
+  if (!path.length) {
+    helpers.currentStore = obj;
+  }
 
   // Unfreeze the store, ready for traversal
   var newStore = unfreeze(helpers.currentStore, helpers);
@@ -1735,7 +1811,8 @@ var updatePath = function (helpers, path, cb) {
   });
 
   // Run the update
-  cb(destination, helpers, traverse);
+  cb && cb(destination, helpers, traverse);
+
 
   // Get ready for new traversal to freeze all paths
   destination = newStore;
@@ -1747,15 +1824,44 @@ var updatePath = function (helpers, path, cb) {
 
   // Make ready a new store and freeze it
   var store = StoreObject(newStore, helpers);
+
   Object.keys(newStore).forEach(function (key) {
-    Object.defineProperty(store, key, {
-      enumerable: true,
-      get: function () {
-        helpers.currentStore = this;
-        return newStore[key];
-      }
-    });
+
+    var propertyDescription = Object.getOwnPropertyDescriptor(newStore, key);
+    if (propertyDescription && propertyDescription.get && propertyDescription.set) {
+      Object.defineProperty(store, key, {
+        get: function () {
+          helpers.currentStore = this;
+          return propertyDescription.get();
+        }
+      });
+
+    } else {
+      Object.defineProperty(store, key, {
+        enumerable: true,
+        get: function () {
+          helpers.currentStore = this;
+          return newStore[key];
+        }
+      });
+    }
+
   });
+
+  Object.defineProperty(store, 'export', {
+    enumerable: false,
+    value: function () {
+      return utils.export(store, helpers.mapper);
+    }
+  });
+
+  Object.defineProperty(store, 'import', {
+    enumerable: false,
+    value: function (obj) {
+      return utils.import(obj, helpers, []);
+    }
+  });
+
   Object.freeze(store);
   return store;
 };
@@ -1766,14 +1872,34 @@ var createStore = function (helpers, state) {
     helpers.currentPath.push(key);
     var branch = traverse(helpers, state[key]);
     helpers.currentPath.pop(key);
-    Object.defineProperty(store, key, {
-      enumerable: true,
-      get: function () {
-        helpers.currentStore = this;
-        return branch;
-      }
-    });
+
+    if (typeof state[key] === 'function') {
+      helpers.mapper.set(store, key, state[key](), store);
+    } else {
+      Object.defineProperty(store, key, {
+        enumerable: true,
+        get: function () {
+          helpers.currentStore = this;
+          return branch;
+        }
+      });
+    }
   });
+
+  Object.defineProperty(store, 'export', {
+    enumerable: false,
+    value: function () {
+      return utils.export(store, helpers.mapper);
+    }
+  });
+
+  Object.defineProperty(store, 'import', {
+    enumerable: false,
+    value: function (obj) {
+      return utils.import(obj, helpers, []);
+    }
+  });
+
   Object.freeze(store);
   return store;
 };
@@ -1787,12 +1913,36 @@ function Store(state) {
   var helpers = {
     currentPath: [],
     currentStore: null,
-    update: function (path, cb) {
-      helpers.currentStore = updatePath(helpers, path, cb);
+    mapper: null,
+    currentMapping: {},
+    depsOverview: {},
+    update: function (obj, cb) {
+      helpers.currentMapping = utils.copyObject(helpers.currentMapping);
+
+      // Go through each path that has a dep to this and update
+      var pathString = obj.__.path.join('');
+      if (helpers.depsOverview[pathString]) {
+        helpers.depsOverview[pathString].forEach(function (dep) {
+          helpers.currentStore = updatePath(helpers, dep);
+        });
+      }
+      helpers.currentStore = updatePath(helpers, obj, cb);
+      return helpers.currentStore;
+    },
+    updateMapping: function (path, key, value) {
+      helpers.currentStore = updatePath(helpers, path, function (obj, helpers, traverse) {
+
+        helpers.mapper.set(obj, key, helpers.mapper.get(obj, key));
+        helpers.currentPath.push(key);
+        obj[key] = value;
+        helpers.currentPath.pop();
+
+      });
       return helpers.currentStore;
     }
   };
 
+  helpers.mapper = Mapper(helpers);
   helpers.currentStore = createStore(helpers, state);
   return helpers.currentStore;
 
@@ -1800,7 +1950,7 @@ function Store(state) {
 
 module.exports = Store;
 
-},{"./StoreArray.js":10,"./StoreObject.js":11}],10:[function(require,module,exports){
+},{"./Mapper.js":9,"./StoreArray.js":11,"./StoreObject.js":12,"./utils.js":13}],11:[function(require,module,exports){
 'use strict';
 var utils = require('./utils.js');
 var StoreArray = function () {
@@ -1813,7 +1963,7 @@ var StoreArray = function () {
   }
   StoreArray.prototype = Object.create(Array.prototype);
   StoreArray.prototype.push = function (item) {
-    return this.__.update(this.__.path, function (obj, helpers, traverse) {
+    return this.__.update(this, function (obj, helpers, traverse) {
       helpers.currentPath.push(obj.length);
       Array.prototype.push.call(obj, traverse(helpers, item));
       helpers.currentPath.pop();
@@ -1823,7 +1973,7 @@ var StoreArray = function () {
     var args = [].slice.call(arguments, 0);
     var startIndex = args.shift();
     var count = args.shift();
-    return this.__.update(this.__.path, function (obj, helpers, traverse) {
+    return this.__.update(this, function (obj, helpers, traverse) {
 
       var additions = args.map(function (arg, index) {
         helpers.currentPath.push(startIndex + index);
@@ -1846,7 +1996,7 @@ var StoreArray = function () {
   };
   StoreArray.prototype.concat = function () {
     var args = [].slice.call(arguments, 0);
-    return this.__.update(this.__.path, function (obj, helpers, traverse) {
+    return this.__.update(this, function (obj, helpers, traverse) {
       args.map(function (arg) {
         if (Array.isArray(arg)) {
           arg.map(function (deepArg) {
@@ -1863,7 +2013,7 @@ var StoreArray = function () {
     });
   };
   StoreArray.prototype.unshift = function (item) {
-    return this.__.update(this.__.path, function (obj, helpers, traverse) {
+    return this.__.update(this, function (obj, helpers, traverse) {
       Array.prototype.unshift.call(obj, traverse(helpers, item));
 
       // Update paths
@@ -1876,9 +2026,9 @@ var StoreArray = function () {
 
     });
   };
-  StoreArray.prototype.shift = function (item) {
-    return this.__.update(this.__.path, function (obj, helpers, traverse) {
-      Array.prototype.shift.call(obj, traverse(helpers, item));
+  StoreArray.prototype.shift = function () {
+    return this.__.update(this, function (obj, helpers, traverse) {
+      Array.prototype.shift.call(obj);
 
       // Update paths
       for (var x = 0; x < obj.length; x++) {
@@ -1891,7 +2041,7 @@ var StoreArray = function () {
     });
   };
   StoreArray.prototype.pop = function () {
-    return this.__.update(this.__.path, function (obj) {
+    return this.__.update(this, function (obj) {
       Array.prototype.pop.call(obj);
     });
   };
@@ -1914,14 +2064,17 @@ var StoreArray = function () {
 
 module.exports = StoreArray();
 
-},{"./utils.js":12}],11:[function(require,module,exports){
+},{"./utils.js":13}],12:[function(require,module,exports){
 'use strict';
 var utils = require('./utils.js');
+var Mapper = require('./Mapper.js');
+
 var StoreObject = function () {
 
   var StoreObjectProto = {
     set: function (key, value) {
-      return this.__.update(this.__.path, function (obj, helpers, traverse) {
+
+      return this.__.update(this, function (obj, helpers, traverse) {
 
         // If an array is set there might be immutable objects in it that needs
         // a path update
@@ -1932,10 +2085,12 @@ var StoreObject = function () {
             }
           });
         }
+
         helpers.currentPath.push(key);
         obj[key] = traverse(helpers, value);
         helpers.currentPath.pop();
       });
+
     },
     toJS: function () {
       return utils.toJS(this);
@@ -1944,26 +2099,45 @@ var StoreObject = function () {
       if (Array.isArray(mergeObj) || typeof mergeObj !== 'object' || mergeObj === null) {
         throw new Error('You have to pass an object to the merge method');
       }
-      return this.__.update(this.__.path, function (obj, helpers, traverse) {
+      return this.__.update(this, function (obj, helpers, traverse) {
         Object.keys(mergeObj).forEach(function (key) {
           helpers.currentPath.push(key);
           obj[key] = traverse(helpers, mergeObj[key]);
           helpers.currentPath.pop();
         });
       });
+    },
+    unset: function(key) {
+      return this.__.update(this, function (obj) {
+        delete obj[key];
+      });
     }
   };
 
   return function (props, helpers) {
     var object = Object.create(StoreObjectProto);
-    Object.keys(props).forEach(function (key) {
-      object[key] = props[key];
-    });
+
     Object.defineProperty(object, '__', {
       value: {
         path: helpers.currentPath.slice(0),
-        update: helpers.update
+        update: helpers.update,
+        updateMapping: helpers.updateMapping,
+        currentMapping: helpers.currentMapping
       }
+    });
+
+    Object.keys(props).forEach(function (key) {
+
+      // If already is a mapping, reset it with new value
+      var propertyDescription = Object.getOwnPropertyDescriptor(props, key);
+      if (propertyDescription && propertyDescription.get && propertyDescription.set) {
+        helpers.mapper.set(object, key, helpers.mapper.get(object, key));
+      } else if (typeof props[key] === 'function') {
+        helpers.mapper.set(object, key, props[key]());
+      } else {
+        object[key] = props[key];
+      }
+
     });
     return object;
   };
@@ -1972,7 +2146,7 @@ var StoreObject = function () {
 
 module.exports = StoreObject();
 
-},{"./utils.js":12}],12:[function(require,module,exports){
+},{"./Mapper.js":9,"./utils.js":13}],13:[function(require,module,exports){
 "use strict";
 var utils = {
   toJS: function (obj) {
@@ -1988,12 +2162,87 @@ var utils = {
     } else {
       return obj;
     }
+  },
+  makeImmutable: function (obj) {
+    if (obj instanceof Array) {
+      var val = obj.map(function (obj) {
+        return utils.makeImmutable(obj);
+      });
+      Object.defineProperty(val, 'toJS', {
+        value: utils.toJS.bind(null, val)
+      });
+      Object.freeze(val);
+      return val;
+    } else if (typeof obj === 'object' && obj !== null) {
+      var val = Object.keys(obj).reduce(function (newObj, key) {
+        newObj[key] = utils.makeImmutable(obj[key]);
+        return newObj;
+      }, {});
+      Object.defineProperty(val, 'toJS', {
+        value: utils.toJS.bind(null, val)
+      });
+      Object.freeze(val);
+      return val;
+    } else {
+      return obj;
+    }
+  },
+  export: function (obj, mapping) {
+
+    if (obj instanceof Array) {
+      return obj.map(function (obj) {
+        return utils.export(obj, mapping);
+      });
+    } else if (typeof obj === 'object' && obj !== null) {
+      return Object.keys(obj).reduce(function (newObj, key) {
+
+        if (obj.__ && mapping.get(obj, key)) {
+          newObj[key] = mapping.get(obj, key).value;
+        } else {
+          newObj[key] = utils.export(obj[key], mapping);
+        }
+        return newObj;
+      }, {});
+    } else {
+      return obj;
+    }
+  },
+  import: function (obj, helpers, path) {
+    return Object.keys(obj).reduce(function (store, key) {
+
+      if (!(obj[key] instanceof Array) && typeof obj[key] === 'object' && obj[key] !== null && utils.getByPath(store, path)) {
+        path.push(key);
+        var result = utils.import(obj[key], helpers, path);
+        path.pop();
+        return result;
+      } else {
+        return utils.getByPath(store, path).set(key, obj[key]);
+      }
+
+    }, helpers.currentStore);
+
+  },
+  getByPath: function (obj, path) {
+    return path.reduce(function (obj, key) {
+      return obj[key];
+    }, obj)
+  },
+  isSame: function (objA, objB) {
+    return Object.keys(objA).reduce(function (isSame, key) {
+      return isSame ? objA[key] === objB[key] : false;
+    }, true);
+  },
+  copyObject: function (obj) {
+    return Object.keys(obj).reduce(function (newObj, key) {
+      newObj[key] = obj[key];
+      return newObj;
+    }, {});
   }
 };
 
 module.exports = utils;
 
-},{}],13:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 (function (global){
 var angular = global.angular || require('angular') && global.angular;
 function safeDeepClone(circularValue, refs, obj) {

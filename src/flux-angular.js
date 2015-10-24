@@ -9,6 +9,9 @@ var safeDeepClone = require('./safeDeepClone.js');
 var Dispatchr = require('dispatchr')();
 var EventEmitter2 = require('eventemitter2').EventEmitter2;
 
+var angularModule = angular.module;
+var stores = [];
+
 // A function that creates stores
 var createStore = function (name, spec, maxListeners, flux) {
 
@@ -70,6 +73,9 @@ var FluxService = function (useCloning, maxListeners) {
   this.dispatcher = new Dispatchr();
 
   this.dispatch = function () {
+    if (stores.length) {
+      console.warn("There are still stores not injected: " + stores.join(",") + ". Make sure to inject all stores before running any dispatches.");
+    }
     this.dispatcher.dispatch.apply(this.dispatcher, arguments);
   };
 
@@ -155,8 +161,6 @@ var FluxService = function (useCloning, maxListeners) {
 // Monkeypatch angular module (add .store)
 
 // Wrap "angular.module" to attach store method to module instance
-var angularModule = angular.module;
-var preInjectList = [];
 angular.module = function () {
 
   // Call the module as normaly and grab the instance
@@ -165,13 +169,14 @@ angular.module = function () {
   // Attach store method to instance
   moduleInstance.store = function (storeName, storeDefinition) {
 
-    // Add to preinject array
-    preInjectList.push(storeName);
+    // Add to stores array
+    stores.push(storeName);
 
     // Create a new store
     this.factory(storeName, ['$injector', 'flux', function ($injector, flux) {
 
       var storeConfig = $injector.invoke(storeDefinition);
+      stores.splice(stores.indexOf(storeName), 1);
       return flux.createStore(storeName, storeConfig);
 
     }]);
@@ -205,11 +210,6 @@ angular.module('flux', [])
 
     if (angular.mock) {
       flux.reset();
-    } else {
-
-      // Pre-inject all stores when not testing
-      $injector.invoke(preInjectList.concat(function () {}));
-
     }
 
     // Extend scopes with $listenTo
