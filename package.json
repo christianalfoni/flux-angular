@@ -31,10 +31,7 @@
   },
   "dependencies": {
     "angular": "~1.2",
-    "baobab": "^0.2.2",
-    "dispatchr": "^0.2.8",
-    "eventemitter2": "^0.4.14",
-    "immutable": "^3.6.2",
-    "immutable-store": "^0.5.1"
+    "baobab": "^2.2.1",
+    "dispatchr": "^0.2.8"
   }
 }

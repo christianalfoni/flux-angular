@@ -2,18 +2,16 @@
 
 // When requiring Angular it is added to global for some reason
 var angular = global.angular || require('angular') && global.angular;
-var ImmutableStore = require('immutable-store');
 
 // Dependencies
-var safeDeepClone = require('./safeDeepClone.js');
+var Baobab = require('baobab');
 var Dispatchr = require('dispatchr')();
-var EventEmitter2 = require('eventemitter2').EventEmitter2;
 
 var angularModule = angular.module;
 var stores = [];
 
 // A function that creates stores
-var createStore = function (name, spec, maxListeners, flux) {
+var createStore = function (name, spec, immutableDefaults, flux) {
 
   spec = spec || {};
 
@@ -30,33 +28,28 @@ var createStore = function (name, spec, maxListeners, flux) {
       this.dispatcher.waitFor(stores, cb.bind(this));
     };
 
-    // Call the constructor of EventEmitter2
-    EventEmitter2.call(this, {
-      wildcard: true
-    });
-
-    if (typeof maxListeners === 'number') {
-      this.setMaxListeners(maxListeners);
-    } else if (maxListeners && typeof maxListeners[name] === 'number') {
-      this.setMaxListeners(maxListeners[name]);
+    if (!this.initialize) {
+      throw new Error('Store ' + name + ' does not have an initialize method which is is necessary to set the initial state');
     }
 
-    if (this.initialize) {
-      this.initialize();
-    }
+    this.initialize();
   };
 
   // Add constructor properties, as required by Yahoo Dispatchr
   Store.handlers = spec.handlers;
   Store.storeName = name;
 
-  // Inherits from EventEmitter2
-  Store.prototype = Object.create(EventEmitter2.prototype);
-
-  // Create conveniance for emitting change events
-  Store.prototype.emitChange = function () {
-    this.emit('change');
+  // Instantiates immutable state and saves it to private variable that can be used for setting listeners
+  Store.prototype.immutable = function (initialState, options) {
+    if (this.__tree) {
+      this.__tree.set(initialState);
+    } else {
+      this.__tree = new Baobab(initialState, angular.extend({}, immutableDefaults, options));
+    }
+    return this.__tree;
   };
+
+  Store.prototype.monkey = Baobab.monkey;
 
   // Attach store definition to the prototype
   Object.keys(spec).forEach(function (key) {
@@ -68,20 +61,20 @@ var createStore = function (name, spec, maxListeners, flux) {
 };
 
 // Flux Service is a wrapper for the Yahoo Dispatchr
-var FluxService = function (useCloning, maxListeners) {
+var FluxService = function (immutableDefaults) {
   this.stores = [];
   this.dispatcher = new Dispatchr();
 
   this.dispatch = function () {
     if (stores.length) {
-      console.warn("There are still stores not injected: " + stores.join(",") + ". Make sure to inject all stores before running any dispatches.");
+      console.warn('There are still stores not injected: ' + stores.join(',') + '. Make sure to inject all stores before running any dispatches.');
     }
     this.dispatcher.dispatch.apply(this.dispatcher, arguments);
   };
 
   this.createStore = function (name, spec) {
 
-    var store = createStore(name, spec, maxListeners, this);
+    var store = createStore(name, spec, immutableDefaults, this);
     var storeInstance;
 
     // Create the exports object
@@ -106,14 +99,12 @@ var FluxService = function (useCloning, maxListeners) {
           enumerable: descriptor.enumerable,
           configurable: descriptor.configurable,
           get: function () {
-            var value = descriptor.get.apply(storeInstance, arguments);
-            return useCloning ? safeDeepClone('[Circular]', [], value) : value;
+            return descriptor.get.apply(storeInstance, arguments);
           }
         });
       } else {
         store.exports[key] = function () {
-          var value = spec.exports[key].apply(storeInstance, arguments);
-          return useCloning ? safeDeepClone('[Circular]', [], value) : value;
+          return spec.exports[key].apply(storeInstance, arguments);
         };
         spec.exports[key] = spec.exports[key].bind(storeInstance);
       }
@@ -148,15 +139,12 @@ var FluxService = function (useCloning, maxListeners) {
     Dispatchr.stores = {};
     Dispatchr.handlers = {};
     this.stores = [];
+    stores = [];
   };
 
-  this.immutable = function (state) {
-    return new ImmutableStore(state);
-  };
-
+  // Expose Baobab in case user wants access to it for use outside a store
+  this.Baobab = Baobab;
 };
-
-
 
 // Monkeypatch angular module (add .store)
 
@@ -191,55 +179,48 @@ angular.module = function () {
 
 angular.module('flux', [])
   .provider('flux', function FluxProvider () {
-    var cloning = true;
-    var maxListeners = null;
+    var immutableDefaults = {};
 
-    this.useCloning = function (useCloning) {
-      cloning = useCloning;
-    };
-
-    this.setMaxListeners = function (maxListenersDescription) {
-      maxListeners = maxListenersDescription;
+    // Defaults that are passed on to Baobab: https://github.com/Yomguithereal/baobab#options
+    this.setImmutableDefaults = function (defaults) {
+      immutableDefaults = defaults;
     };
 
     this.$get = [function fluxFactory () {
-      return new FluxService(cloning, maxListeners);
+      return new FluxService(immutableDefaults);
     }];
   })
   .run(['$rootScope', '$injector', 'flux', function ($rootScope, $injector, flux) {
-
     if (angular.mock) {
       flux.reset();
     }
 
     // Extend scopes with $listenTo
-    $rootScope.constructor.prototype.$listenTo = function (storeExport, eventName, callback) {
+    $rootScope.constructor.prototype.$listenTo = function (storeExport, mapping, callback) {
+      var cursor;
+      var store = flux.getStore(storeExport);
+
+      if (!store.__tree) {
+        throw new Error('Store ' + storeExport.storeName + ' has not defined state with this.immutable() which is required in order to use $listenTo');
+      }
 
       if (!callback) {
-        callback = eventName;
-        eventName = '*';
+        callback = mapping;
+        cursor = store.__tree;
+      } else {
+        cursor = store.__tree.select(mapping);
       }
 
-      var self = this;
-      var callbackWrapper = function() {
-        var args = [].slice.call(arguments);
-        self.dispatcherEvent = this.event;
-        callback.apply(self, args);
-      }
+      cursor.on('update', callback);
 
-      var store = flux.getStore(storeExport);
-      var addMethod = eventName === '*' ? 'onAny' : 'on';
-      var removeMethod = eventName === '*' ? 'offAny' : 'off';
-      var args = eventName === '*' ? [callbackWrapper] : [eventName, callbackWrapper];
-      store[addMethod].apply(store, args);
+      // Call the callback so that state gets the initial sync with the view-model variables
+      callback({});
 
-      // Remove any listeners to the store when scope is destroyed (GC)
+      // Remove the listeners on the store when scope is destroyed (GC)
       this.$on('$destroy', function () {
-        store[removeMethod].apply(store, args);
+        cursor.off('update', callback);
       });
-
     };
-
   }]);
 
 module.exports = 'flux';

@@ -1,249 +1,148 @@
-flux-angular
-==========
 [![Gitter](https://badges.gitter.im/Join Chat.svg)](https://gitter.im/christianalfoni/flux-angular?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-## Flux-Angular 2 now has immutability mode!
-The API of flux-angular is really starting to shape up, but there is still one challenge. To create a one way flow flux-angular clones data retrieved from the exports of a store. This has two performance hits. First of all it is a deep clone process, which can have a high cost on complex data structures. Second Angular will always see data retrieved from getters as a new value, even if it has not changed. This forces Angular to always do a new render, even though there was no need for it.
+# flux-angular
+**flux-angular** makes it easy to implement a performant, scalable, and clean
+[flux application architecture](https://facebook.github.io/flux/docs/overview.html) in an angular
+application.  It does this by providing access to a new `angular.store` method
+for holding immutable application state using [Baobab](https://github.com/Yomguithereal/baobab).
+The `flux` service is exposed for dispatching actions using the [Yahoo Dispatchr](https://github.com/yahoo/dispatchr).
+`$scope.$listenTo` is exposed as a way to respond to changes in a store and sync them with the view-model.
 
-[immutable-store](https://github.com/christianalfoni/immutable-store) is a separate project that solves this issue. Flux-angular can now be run in an immutable mode, where you create immutable data structures for the stores.
-
-- [Features](#features)
-- [Concept](#concept)
 - [Releases](https://github.com/christianalfoni/flux-angular/releases)
 - [FAQ](#faq)
 - [Create a store](#create-a-store)
-- [Configure max listeners](#configure-max-listeners)
-- [Create a component](#create-a-component)
 - [Dispatch actions](#dispatch-actions)
-- [Immutable mode](#immutable-mode)
-- [Event wildcards](#event-wildcards)
 - [Wait for other stores to complete their handlers](#wait-for-other-stores-to-complete-their-handlers)
-- [Lots of actions, use constants](#lots-of-actions-use-constants)
-- [Async operations](#async-operations)
 - [Testing stores](#testing-stores)
 - [Performance](#performance)
 - [Run project](#run-project)
 
 
-## Features
-
-- **Yahoo Dispatchr**
-- **EventEmitter2**
-- **Angular Store**
-- **Scope listenTo**
-- **Immutable**
-
-## Concept
-flux-angular 2 uses a more traditional flux pattern. It has the [Yahoo Dispatchr](https://github.com/yahoo/dispatchr) and [EventEmitter2](https://github.com/asyncly/EventEmitter2) for its event emitting. It also includes the [immutable-store](https://github.com/christianalfoni/immutable-store) that you can use in the **immutable mode** of flux-angular. **Did you really monkeypatch Angular?**. Yes. Angular has a beautiful API (except directives ;-) ) and I did not want flux-angular to feel like an alien syntax invasion, but rather it being a natural part of the Angular habitat. Angular 1.x is a stable codebase and I would be very surprised if this monkeypatch would be affected in later versions.
-
 ## FAQ
-**PhantomJS gives me an error related to bind**:
-PhantomJS does not support ES5 `Function.prototype.bind`, but will in next version. Until then be sure to load the [ES5 shim](https://github.com/es-shims/es5-shim) with your tests.
 
+#### PhantomJS gives me an error related to bind
+PhantomJS does not support ES5 `Function.prototype.bind`, but will in next
+version. Until then be sure to load the [ES5
+shim](https://github.com/es-shims/es5-shim) with your tests.
+
+#### Cannot call dispatch while another dispatch is executing
+This is a problem/feature that is generic to the flux architecture. It can be
+solved by having an action [dispatch multiple
+events](https://github.com/christianalfoni/flux-angular/issues/48).
+
+#### Did you really monkeypatch Angular?
+Yes. Angular has a beautiful API (except directives ;-) ) and I did not want
+flux-angular to feel like an alien syntax invasion, but rather it being a
+natural part of the Angular habitat. Angular 1.x is a stable codebase and I
+would be very surprised if this monkeypatch would be affected in later
+versions.
 
 ## Create a store
-```javascript
-angular.module('app', ['flux'])
-.store('MyStore', function () { 
-  return {
-    comments: [],
-    handlers: {
-      'addComment': 'addComment'
-    },
-    addComment: function (comment) {
-      this.comments.push(comment);
-      this.emitChange();
-    },
-    exports: {
-      getLatestComment: function () {
-        return this.comments[this.comments.length - 1];
-      },
-      get comments() {
-        return this.comments;
-      }
-    }
-  };
-})
-.factory('Stores', function (flux) {
-  return {
-    'StoreA': flux.createStore('StoreA', {}),
-    'StoreB': flux.createStore('StoreB', {})
-  }
-});
-```
 
-## Configure max listeners
-Flux-Angular uses EventEmitter2 which has a failsafe to warn about possible memory leaks. If you are building a large application you might have to increase the number of event listeners allowed globally or on each store.
-```javascript
-angular.module('app', ['flux'])
-.config(function (fluxProvider) {
-  
-  // Globally
-  fluxProvider.setMaxListeners(20); 
-  
-  // Or on each store
-  fluxProvider.setMaxListeners({
-    'MyStore': 5,
-    'MyOtherStore': 20
-  });
+By default the state in a store is immutable which means it cannot be changed
+once created, except through a defined API. If you're unfamiliar with the
+benefits of immutable data [this
+article](http://jlongster.com/Using-Immutable-Data-Structures-in-JavaScript)
+and [this video](https://www.youtube.com/watch?v=I7IdS-PbEgI) explain the theory and benefits.
 
-});
-```
-
-
-## Create a component
-As suggested by egghead.io, [read more here](http://blog.ninja-squad.com/2014/12/15/what-is-coming-in-angularjs-1.4/), you should use directives in the following format. Forget about controllers as they will be removed in Angular 2.0.
-```javascript
-angular.module('app', ['flux'])
-.directive ('myComponent', function () {
-  return {
-    controllerAs: 'myComponent',
-    scope: {},
-    templateUrl: 'myComponent.html',
-    controller: function ($scope, MyStore) {
-
-      $scope.comments = MyStore.comments;
-      $scope.latestComment = MyStore.getLatestComment();
-      $scope.$listenTo(MyStore, function () {
-        $scope.comments = MyStore.comments;
-        $scope.latestComment = MyStore.getLatestComment();
-      });
-
-    }
-  };
-});
-```
-
-## Dispatch actions
-```javascript
-angular.module('app', ['flux'])
-.directive ('myComponent', function () {
-  return {
-    controllerAs: 'myComponent',
-    scope: {},
-    templateUrl: 'myComponent.html',
-    controller: function ($scope, MyStore, flux) {
-
-      $scope.title = '';
-      $scope.addComment = function () {
-        flux.dispatch('addComment', $scope.title);
-        $scope.title = '';
-      };
-
-    }
-  };
-});
-```
-
-## Immutable mode
-If you're new to the idea of immutable data then you may be interested in [this video](https://www.youtube.com/watch?v=I7IdS-PbEgI) from React.js conf which explains the theory and benefits.
-
-On the bright side:
+Some of the pros:
 * Faster reads because there is no deep cloning
 * Less renders and `$scope.$watch` triggers because the reference to the object doesn't change unless the object changes
+* Computed data (by using `this.monkey` in a store) can be observed in the same way
+  as raw data.  This allows for more logic to live in the store (e.g. a
+  sorted version of a list) and for angular to only re-render when the raw data
+  underlying the computed data changes. See the [full
+  docs](https://github.com/Yomguithereal/baobab#computed-data-or-monkey-business).
+* Changes are batched together so that multiple dispatches only trigger one
+  re-render is needed. This can be disabled by setting the `asynchronous`
+  option to false.
 
-On the not so bright side:
-* Need to use a slightly more verbose API for changing state (see below).
+Some of the cons:
+* Need to use a slightly [more verbose API](https://github.com/Yomguithereal/baobab#updates) for changing state.
 * Slightly slower writes
-* `ng-repeat` with immutable objects need to use the `track by` option. Otherwise angular will fail, complaining it can't add the `$$hashKey` variable to the collection items.
-* If your directive/controller does need to modify the immutable object (e.g. for use with `ng-model`) you must use the `toJS()` method when pulling it out of the store.  However, note that primitives are always copied so they don't need `toJS()`.
+* `ng-repeat` with immutable objects need to use the `track by` option.
+  Otherwise angular will fail, complaining it can't add the `$$hashKey`
+  variable to the collection items.
+* If your directive/controller does need to modify the immutable object (e.g.
+  for use with `ng-model`) you must use something like the
+  [angular.copy](https://docs.angularjs.org/api/ng/function/angular.copy)
+  function when pulling it out of the store.  However, note that this has a
+  performance impact. Also note that primitives are always copied so they don't
+  need to be cloned.
 
 Conclusion:
 **It is faster, but a bit more verbose!**
 
-#### Configuration
-To use real immutable objects in your stores, rather than relying on deep clone operations, your application must opt-in to immutability mode by turning off the cloning:
-
+### Configuration
+Options that can be specified for the Baobab immutable store are [described
+here](https://github.com/Yomguithereal/baobab#options).
+For example, you may want to turn off immutability in production for a slight speed
+increase, which you can do by setting the defaults:
 ```javascript
 angular.module('app', ['flux'])
 .config(function (fluxProvider) {
-  fluxProvider.useCloning(false);
+  fluxProvider.setImmutableDefaults({ immutable: false });
 });
 ```
 
-#### Create a store
+### Create a store
 ```javascript
 angular.module('app', ['flux'])
-.store('MyStore', function (flux) {
-  
-  var state = flux.immutable({
-    comments: []
-  });  
-
+.store('MyStore', function () {
   return {
+    initialize: function () {
+      this.state = this.immutable({
+        comments: []
+      });
+    },
     handlers: {
       'addComment': 'addComment'
     },
     addComment: function (comment) {
-      state = state.items.push(comment);
-      this.emitChange();
+      this.state.push('comments', comment);
     },
     exports: {
       getLatestComment: function () {
-        return state.comments[state.comments.length - 1];
+        var comments = this.state.get('comments');
+        return comments[comments.length - 1];
       },
       get comments() {
-        return state.comments;
+        return this.state.get('comments');
       }
     }
   };
 });
 ```
-**Note** that all mutations done to the immutable data structure will return a completely new data structure that needs to replace the old one. 
 
-#### Mutations
+See the [Baobab docs](https://github.com/Yomguithereal/baobab#updates) for
+documentation on how to retrieve and update the immutable state.
+
+### Two way databinding
 ```javascript
 angular.module('app', ['flux'])
-.store('MyStore', function (flux) {
-  
-  var state = flux.immutable({
-    object: {},
-    array: [],
-    primitive: 123
-  });  
-
+.store('MyStore', function () {
   return {
-    handlers: {
-      'allMutations': 'allMutations'
+    initialize: function () {
+      this.state = this.immutable({
+        person: {
+          name: 'Jane',
+          age: 30,
+          likes: 'awesome stuff'
+        }
+      });
     },
-    allMutations: function (comment) {
-      state = state.object.set('foo', 'bar');
-      state = state.object.merge({something: 'else'});
-      state = state.array.push('foo');
-      state = state.array.splice(0, 1, 'bar');
-      state = state.array.pop();
-      state = state.array.concat(['something']);
-      state = state.array.shift();
-      state = state.array.unshift('else');
-      state = state.set('primitive', 456);
-    },
-    exports: {}
-  };
-});
-```
-
-#### Two way databinding
-```javascript
-angular.module('app', ['flux'])
-.store('MyStore', function (flux) {
-  var state = flux.immutable({
-    person: {
-      name: 'Jane',
-      age: 30,
-      likes: 'awesome stuff'
-    }
-  });
-  return {
     handlers: {
       'savePerson': 'savePerson'
     },
-    savePerson: function (updatedPerson) {
-      state = state.person.merge(updatedPerson);
-      this.emitChange();
+    savePerson: function (payload) {
+      this.state.merge('person', payload.person);
+    },
+    saveName: function (payload) {
+      this.state.set(['person', 'name'], payload.name);
     },
     exports: {
       get person() {
-        return state.person;
+        return this.state.get('person');
       }
     }
   };
@@ -254,134 +153,122 @@ angular.module('app', ['flux'])
     scope: {},
     templateUrl: 'myComponent.html',
     controller: function ($scope, MyStore, flux) {
-
-      $scope.person = MyStore.person.toJS();
       $scope.savePerson = function () {
-        flux.dispatch('savePerson', $scope.person);
+        flux.dispatch('savePerson', { person: $scope.person });
       };
-      $scope.$listenTo(MyStore, function () {
-        $scope.person = MyStore.person.toJS();
-      });
+      $scope.$listenTo(MyStore, setStoreVars);
+      $scope.$listenTo(MyStore, ['person', 'name'], setName);
 
+      function setStoreVars() {
+        $scope.person = MyStore.person;
+      }
+
+      function setName() {
+        $scope.name = MyStore.person.name;
+      }
     }
   };
 });
 ```
-By using the `.toJS()` method we extract that state from the immutable object or array and allow Angular to update those values. We can then dispatch the updated values and merge them back into the immutable object.
+By using the `.$listenTo()` method we set up a callback that will be fired
+whenever any state in the store changes.
+Also demonstrated via the `setName` example is that you can trigger an update
+only when a specific node of the tree is changed.  This gives you more control
+over how controllers and directives react to changes in the store.
+Thus, when we dispatch the updated values and merge them into the immutable
+object the callback is triggered and our scope properties can be synced with
+the store.
 
-
-### Event wildcards
-You can also trigger specific events in addition to `this.emitChange()`. Due to Angulars dirtycheck you are given more control of how controllers and directives react to changes in the store. By using wildcards you can choose to listen to any event change in a store, within a specific state or a specific event. All the following listeners will trigger when MyStore runs `this.emit('comments.add')`:
+## Dispatch actions
+It can be helpful to create a service for dispatching actions related to a
+store since different components may want to trigger the same action.
+Additionally, the action methods are the place where the coordination of
+multiple dispatch calls occur, as shown in the `addComment` method below.
 
 ```javascript
 angular.module('app', ['flux'])
-.directive ('myComponent', function () {
-  return {
-    controllerAs: 'myComponent',
-    scope: {},
-    templateUrl: 'myComponent.html',
-    controller: function ($scope, MyStore, flux) {
-
-      $scope.$listenTo(MyStore, 'comments.add', function () {
-        $scope.comments = MyStore.comments;
-      });
-
-      $scope.$listenTo(MyStore, 'comments.*', function () {
-        $scope.comments = MyStore.comments;
-      });
-
-      $scope.$listenTo(MyStore, '*', function () {
-        $scope.comments = MyStore.comments;
-      });
-
-    }
+// When you develop a larger application, especially with lots of async
+// operations it can be a good idea to define your actions as constants. That way
+// it is less likely that a typo becomes confusing.
+.constant('actions', {
+  COMMENT_ADD: 'COMMENT_ADD',
+  COMMENT_ADD_SUCCESS: 'COMMENT_ADD_SUCCESS',
+  COMMENT_ADD_ERROR: 'COMMENT_ADD_ERROR'
+})
+.factory('commentActions', function ($http, flux, actions) {
+  var service = {
+    setTitle: setTitle,
+    addComment: addComment
   };
+  return service;
+
+  // An exaple of a basic dispatch using a string as an action key and a payload.
+  // One or more stores is expected to have a handler for COMMENT_SET_TITLE
+  function setTitle(title) {
+    flux.dispatch('COMMENT_SET_TITLE', { title: title });
+  }
+
+  // It is not recommended to run async operations in your store handlers. The
+  // reason is that you would have a harder time testing and the **waitFor**
+  // method also requires the handlers to be synchronous. You solve this by having
+  // async services, also called **action creators** or **API adapters**.
+  function addComment(comment) {
+    flux.dispatch(actions.COMMENT_ADD, { comment: comment });
+    $http.post('/comments', comment)
+    .then(function () {
+      flux.dispatch(actions.COMMENT_ADD_SUCCESS, { comment: comment });
+    })
+    .catch(function (error) {
+      flux.dispatch(actions.COMMENT_ADD_ERROR, { comment: comment, error: error });
+    });
+  }
 });
 ```
 
 ## Wait for other stores to complete their handlers
+The **waitFor** method allows you to let other stores handle the action before
+the current store acts upon it. You can also pass an array of stores. It was
+decided to run this method straight off the store, as it gives more sense and
+now the callback is bound to the store itself.
+
 ```javascript
 angular.module('app', ['flux'])
 .store('CommentsStore', function () {
-  
   return {
-    comments: [],
+    initialize: function() {
+      this.state = this.immutable({ comments: [] });
+    },
     handlers: {
       'addComment': 'addComment'
     },
     addComment: function (comment) {
       this.waitFor('NotificationStore', function () {
-        this.comments.push(comment);
-        this.emit('comments.add');
+        this.state.push('comments', comment);
       });
     },
     getComments: function () {
-      return this.comments;
+      return this.state.get('comments');
     }
   };
-
 })
 .store('NotificationStore', function () {
-  
   return {
-    notifications: [],
+    initialize: function() {
+      this.state = this.immutable({ notifications: [] });
+    },
     handlers: {
       'addComment': 'addNotification'
     },
     addNotification: function (comment) {
-      this.notifications.push('Something happened');
-      comment.hasNotified = true;
+      this.state.push('notifications', 'Something happened');
     },
     exports: {
       getNotifications: function () {
-        return this.notifications;
+        return this.state.get('notifications');
       }
     }
   };
-
 });
-```
-The **waitFor** method allows you to let other stores handle the action before the current store acts upon it. You can also pass an array of stores. It was decided to run this method straight off the store, as it gives more sense and now the callback is bound to the store itself.
-
-### Lots of actions, use constants
-When you develop a larger application, especially with lots of async operations it can be a good idea to define your actions as constants. That way it is less likely that a typo becomes confusing.
-
-```javascript
-angular.module('app', ['flux'])
-.constant('actions', {
-  'COMMENT_ADD': 'comment_add'
-})
-.controller('MyCtrl', function (flux, actions) {
-  $scope.addComment = function (comment) {
-    flux.dispatch(actions.COMMENT_ADD, comment);
-  };
-});
-```
-
-### Async operations
-It is not recommended to run async operations in your store handlers. The reason is that you would have a harder time testing and the **waitFor** method also requires the handlers to be synchronous. You solve this by having async services, also called **action creators** or **API adapters**.
-
-```javascript
-angular.module('app', ['flux'])
-.constant('actions', {
-  'COMMENT_ADD': 'comment_add',
-  'COMMENT_ADD_SUCCESS': 'comment_add_success',
-  'COMMENT_ADD_ERROR': 'comment_add_error'
-})
-.factory('CommentActions', function ($http, flux, actions) {
-  return {
-    addComment: function (comment) {
-      flux.dispatch(actions.COMMENT_ADD, comment);
-      $http.post('/comments', comment)
-      .success(function () {
-        flux.dispatch(actions.COMMENT_ADD_SUCCESS, comment);
-      })
-      .error(function (error) {
-        flux.dispatch(actions.COMMENT_ADD_ERROR, comment, error);
-      });
-    }
-  };
-})
 ```
 
 ### Testing stores
@@ -389,7 +276,6 @@ When Angular Mock is loaded flux-angular will reset stores automatically.
 
 ```javascript
 describe('adding items', function () {
-
   beforeEach(module('app'));
 
   it('it should add strings dispatched to addItem', inject(function (MyStore, flux) {
@@ -401,12 +287,25 @@ describe('adding items', function () {
     flux.dispatch('addItem', 1)
     expect(MyStore.getItems()).toEqual([1]);
   }));
+});
+```
 
+If you are doing integration tests using protractor you will want to disable
+asynchronous event dispatching in Baobab since it relies on `setTimeout`, which
+protractor can't detect:
+
+```javascript
+browser.addMockModule('protractorFixes', function() {
+  angular.module('protractorFixes', [])
+  .config(function (fluxProvider) {
+    fluxProvider.setImmutableDefaults({ asynchronous: false });
+  });
 });
 ```
 
 ### Performance
-Any $scopes listening to stores are removed when the $scope is destroyed. When it comes to immutability mode against normal mode it is difficult to measure exactly how much benefit you get. It depends on the amount of data you have in your stores and how often you trigger changes. I would encourage running immutability mode as the API is pretty much the same and you should get a serious performance boost.
+Any $scopes listening to stores are removed when the $scope is destroyed.
+Immutability (which uses `Object.freeze`) can be [disabled in production](#configuration).
 
 ### Run project
 1. `npm install`
