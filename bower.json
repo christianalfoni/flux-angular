@@ -2,6 +2,13 @@
   "name": "flux-angular",
   "version": "2.5.0",
   "main": "release/flux-angular.js",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "tests",
+    "build"
+  ],
   "dependencies": {
     "angular": "1.2 - 1.4"
   },
