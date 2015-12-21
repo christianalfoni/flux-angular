@@ -9,6 +9,7 @@ var Dispatchr = require('dispatchr')();
 
 var angularModule = angular.module;
 var stores = [];
+var autoInjectStores = false;
 
 // A function that creates stores
 var createStore = function (name, spec, immutableDefaults, flux) {
@@ -67,7 +68,7 @@ var FluxService = function (immutableDefaults) {
 
   this.dispatch = function () {
     if (stores.length) {
-      console.warn('There are still stores not injected: ' + stores.join(',') + '. Make sure to inject all stores before running any dispatches.');
+      console.warn('There are still stores not injected: ' + stores.join(',') + '. Make sure to manually inject all stores before running any dispatches or set autoInjectStores to true.');
     }
     this.dispatcher.dispatch.apply(this.dispatcher, arguments);
   };
@@ -186,6 +187,10 @@ angular.module('flux', [])
       immutableDefaults = defaults;
     };
 
+    this.autoInjectStores = function(val) {
+      autoInjectStores = val;
+    };
+
     this.$get = [function fluxFactory () {
       return new FluxService(immutableDefaults);
     }];
@@ -193,6 +198,10 @@ angular.module('flux', [])
   .run(['$rootScope', '$injector', 'flux', function ($rootScope, $injector, flux) {
     if (angular.mock) {
       flux.reset();
+    }
+
+    if (!angular.mock && autoInjectStores) {
+      $injector.invoke(stores.concat(angular.noop));
     }
 
     // Extend scopes with $listenTo
