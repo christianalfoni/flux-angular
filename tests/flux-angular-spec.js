@@ -1,287 +1,203 @@
 describe('FLUX-ANGULAR', function() {
-
-  describe('Using the store method', function() {
+  describe('.store', function() {
+    var $scope, flux, cb, MyStore, MyStoreB;
 
     beforeEach(function() {
-
       angular.module('test', ['flux'])
+        .config(function (fluxProvider) {
+          fluxProvider.setImmutableDefaults({ asynchronous: false });
+        })
         .store('MyStore', function() {
           return {
-            items: [],
-            handlers: {
-              addItem: 'addItem'
+            initialize: function() {
+              this.state = this.immutable({
+                items: [],
+                name: 'test'
+              });
             },
-            addItem: function(item) {
-              this.items.push(item);
+            handlers: {
+              addItem: 'addItem',
+              setName: 'setName'
+            },
+            addItem: function(payload) {
+              this.state.push('items', payload.item);
+            },
+            setName: function(payload) {
+              this.state.set('name', payload.name);
             },
             exports: {
               getItems: function() {
-                return this.items;
+                return this.state.get('items');
               },
               getFirstItem: function() {
                 return this.exports.getItems()[0];
               },
               get items() {
-                return this.items;
+                return this.state.get('items');
+              },
+              get name() {
+                return this.state.get('name');
               }
             }
           };
-        });
-
-      module('test');
-
-    });
-
-    it('should expose the exports object of the store', inject(function(MyStore) {
-      expect(MyStore.getItems).toBeDefined();
-      expect(MyStore.items).toBeDefined();
-    }));
-
-    it('should clone state values when exported', inject(function(MyStore, flux) {
-      var store = flux.getStore(MyStore);
-      expect(MyStore.getItems()).not.toBe(store.items);
-      expect(MyStore.items).not.toBe(store.items);
-    }));
-
-    it('should handle a dispatched message', inject(function(MyStore, flux) {
-      flux.dispatch('addItem', 'foo');
-      expect(MyStore.getItems()[0]).toEqual('foo');
-      expect(MyStore.items[0]).toEqual('foo');
-    }));
-
-    it('should bind export methods to the store instance', inject(function(MyStore, flux) {
-      flux.dispatch('addItem', 'foo');
-      expect(MyStore.getFirstItem()).toEqual('foo');
-    }))
-
-  });
-
-  describe('Waiting for other stores', function() {
-
-    beforeEach(function() {
-
-      angular.module('test', ['flux'])
-        .store('StoreA', function() {
+        })
+        .store('MyStoreB', function() {
           return {
-            items: [],
+            initialize: function() {
+              this.state = this.immutable({ items: [] });
+            },
             handlers: {
               addItem: 'addItem',
-              addItems: 'addItems'
+              addItemWithBadWaitFor: 'addItemWithBadWaitFor'
             },
-            addItem: function(item) {
-              this.waitFor('StoreB', function() {
-                item.stores.push('StoreA');
-                this.items.push(item);
+            addItem: function(payload) {
+              this.waitFor('MyStore', function() {
+                this.state.push('items', payload.item);
               });
             },
-            addItems: function(items) {
-              this.items = this.items.concat(items);
+            addItemWithBadWaitFor: function(payload) {
+              this.waitFor('NotAStore', function() {
+                this.state.push('items', payload.item);
+              });
             },
             exports: {
               getItems: function() {
-                return this.items;
+                return this.state.get('items');
               }
             }
           };
         })
-        .store('StoreB', function() {
+        .store('MyStoreC', function() {
           return {
-            items: [],
-            handlers: {
-              addItem: 'addItem',
-              addItems: 'addItems'
-            },
-            addItem: function(item) {
-              item.stores.push('StoreB');
-              this.items.push(item);
-            },
-            addItems: function(items) {
-              this.waitFor(['StoreA'], function() {
-                this.items = this.items.concat(items);
-              });
+            initialize: function() {
+              this.state = this.immutable({ items: [] }, { asynchronous: true });
             },
             exports: {}
           };
         });
 
       module('test');
-
     });
 
-    it('should wait for other store defined to finish first', inject(function(StoreA, StoreB, flux) {
-      flux.dispatch('addItem', {
-        stores: []
+    beforeEach(inject(function($rootScope, _MyStore_, _MyStoreB_, _flux_) {
+      MyStore = _MyStore_;
+      MyStoreB = _MyStoreB_;
+      flux = _flux_;
+      $scope = $rootScope.$new();
+      cb = jasmine.createSpy('callback');
+    }));
+
+    describe('initializing state', function() {
+      it('should not expose the private tree property', function() {
+        expect(MyStore.__tree).toBeUndefined();
       });
-      expect(StoreA.getItems()[0].stores).toEqual(['StoreB', 'StoreA']);
-    }));
 
-    it('should be able to wait for stores using an array', inject(function(StoreA, StoreB, flux) {
-      flux.dispatch('addItems', ['foo']);
-      expect(StoreA.getItems()).toEqual(['foo']);
-    }));
-
-    it('should give error when store waited for is not injected', inject(function(StoreA, flux) {
-      expect(flux.dispatch.bind(flux, 'addItem', 'foo')).toThrow();
-    }));
-
-  });
-
-  describe('Listening to events', function() {
-
-    beforeEach(function() {
-
-      angular.module('test', ['flux'])
-        .factory('MyStore', function(flux) {
-          return flux.createStore('MyStore', {
-            items: [],
-            handlers: {
-              addItem: 'addItem',
-              triggerEvent: 'triggerEvent'
-            },
-            addItem: function(item) {
-              this.items.push(item);
-              this.emitChange();
-            },
-            triggerEvent: function() {
-              this.emit('event');
-            },
-            exports: {
-              getItems: function() {
-                return this.items;
-              }
-            }
-          });
-        });
-
-      module('test');
-
-    });
-
-    it('should have a $listenTo method', inject(function(MyStore, $rootScope) {
-      var $scope = $rootScope.$new();
-      expect($scope.$listenTo).toBeDefined();
-    }));
-
-    it('should call the callback when change event is emitted', inject(function(MyStore, $rootScope, flux) {
-      var $scope = $rootScope.$new();
-      var cb = jasmine.createSpy('callback');
-      $scope.$listenTo(MyStore, cb);
-      flux.dispatch('addItem', 'foo');
-      expect(cb.calls.count()).toEqual(1);
-    }));
-
-    it('should call the callback if specific event is listened to and emitted', inject(function(MyStore, $rootScope, flux) {
-      var $scope = $rootScope.$new();
-      var cb = jasmine.createSpy('callback');
-      $scope.$listenTo(MyStore, 'event', cb);
-      flux.dispatch('triggerEvent');
-      expect(cb.calls.count()).toEqual(1);
-    }));
-
-    it('should keep the prototype of objects when retrieved from the store', inject(function(MyStore, $rootScope, flux) {
-      var MyObject = function() {
-        this.foo = 'bar';
-      };
-      MyObject.prototype = {
-        constructor: MyObject,
-        getFoo: function() {
-          return this.foo;
-        }
-      };
-      var $scope = $rootScope.$new();
-      $scope.$listenTo(MyStore, function() {
-        expect(MyStore.getItems()[0].getFoo()).toEqual('bar');
+      it('should not error if initialize is called again to reset the state', function() {
+        flux.dispatch('addItem', { item: 'foo' });
+        expect(MyStore.items.length).toEqual(1);
+        flux.dispatcher.storeInstances.MyStore.initialize();
+        expect(MyStore.items.length).toEqual(0);
       });
-      flux.dispatch('addItem', new MyObject());
-    }));
 
-  });
-
-  describe('Set max listeners with number', function() {
-
-    var maxListeners = 2;
-
-    beforeEach(function() {
-
-      angular.module('test', ['flux'])
-        .config(function(fluxProvider) {
-          fluxProvider.setMaxListeners(maxListeners);
-        })
-        .factory('MyStore', function(flux) {
-          return flux.createStore('MyStore', {
-            handlers: {},
-            exports: {}
-          });
-        });
-
-      module('test');
-
+      it('should not lose any event bindings if it is initialized again', function() {
+        $scope.$listenTo(MyStore, cb);
+        flux.dispatcher.storeInstances.MyStore.initialize();
+        flux.dispatch('addItem', { item: 'foo' });
+        expect(cb.calls.count()).toEqual(3); // once for initialization, once for state reset, and once for addItem
+      });
     });
 
-    it('should be able to add the amount of listeners set by test, but not more', inject(function(MyStore, $rootScope, flux) {
+    describe('accessors', function() {
+      it('should expose immutable data', function() {
+        expect(Object.isFrozen(MyStore.items)).toBe(true);
+      });
 
-      var cb = jasmine.createSpy('callback');
-      var $scope = $rootScope.$new();
-      var error = console.error
-      console.error = function() {
-        cb();
-      };
+      it('should allow both getter and function accessors', function() {
+        expect(MyStore.items.length).toEqual(0);
+        expect(MyStore.getItems().length).toEqual(0);
+      });
 
-      $scope.$listenTo(MyStore, 'test', function() {});
-      $scope.$listenTo(MyStore, 'test', function() {});
-      $scope.$listenTo(MyStore, 'test', function() {});
+      it('should export identical object identities even when accessors are different', function() {
+        expect(MyStore.getItems()).toBe(MyStore.items);
+      });
 
-      expect(cb.calls.count()).toBe(1);
-
-      console.error = error;
-
-    }));
-
-  });
-
-  describe('Set max listeners with object', function() {
-
-    var maxListeners = 2;
-
-    beforeEach(function() {
-
-      angular.module('test', ['flux'])
-        .config(function(fluxProvider) {
-          fluxProvider.setMaxListeners({
-            'MyStore': 2
-          });
-        })
-        .factory('MyStore', function(flux) {
-          return flux.createStore('MyStore', {
-            handlers: {},
-            exports: {}
-          });
-        });
-
-      module('test');
-
+      it('should bind export methods to the store instance', function() {
+        flux.dispatch('addItem', { item: 'foo' });
+        expect(MyStore.getFirstItem()).toEqual('foo');
+      });
     });
 
-    it('should be able to add the amount of listeners set by test, but not more', inject(function(MyStore, $rootScope, flux) {
+    describe('handlers', function() {
+      it('should call the correct handler with the payload', function() {
+        flux.dispatch('addItem', { item: 'foo' });
+        expect(MyStore.items.length).toEqual(1);
+        expect(MyStore.items[0]).toEqual('foo');
+      });
+    });
 
-      var cb = jasmine.createSpy('callback');
-      var $scope = $rootScope.$new();
-      var error = console.error
-      console.error = function() {
-        cb();
-      };
+    describe('event listeners', function() {
+      it('should have a $listenTo method', function() {
+        expect($scope.$listenTo).toBeDefined();
+      });
 
-      $scope.$listenTo(MyStore, 'test', function() {});
-      $scope.$listenTo(MyStore, 'test', function() {});
-      $scope.$listenTo(MyStore, 'test', function() {});
+      it('should call the callback when $listenTo is first attached so that the view-model is initialized', function() {
+        $scope.$listenTo(MyStore, cb);
+        expect(cb.calls.count()).toEqual(1);
+        expect(cb.calls.argsFor(0)[0]).toEqual({});
+      });
 
-      expect(cb.calls.count()).toBe(1);
+      it('should call the callback when state is changed on any part of the tree', function() {
+        $scope.$listenTo(MyStore, cb);
+        cb.calls.reset();
+        flux.dispatch('addItem', { item: 'foo' });
+        expect(cb.calls.count()).toEqual(1);
+        flux.dispatch('setName', { name: 'bar' });
+        expect(cb.calls.count()).toEqual(2);
+      });
 
-      console.error = error;
+      it('should call the callback if a specific cursor is listened to and changed', function() {
+        $scope.$listenTo(MyStore, ['items'], cb);
+        cb.calls.reset();
+        flux.dispatch('addItem', { item: 'foo' });
+        expect(cb.calls.count()).toEqual(1);
+        flux.dispatch('setName', { name: 'bar' });
+        expect(cb.calls.count()).toEqual(1);
+      });
 
-    }));
+      it('should remove the listener when the scope is destroyed', function() {
+        $scope.$listenTo(MyStore, ['items'], cb);
+        cb.calls.reset();
+        $scope.$destroy();
+        flux.dispatch('addItem', { item: 'foo' });
+        expect(cb.calls.count()).toEqual(0);
+      });
+    });
 
+    describe('waiting for other stores', function() {
+      it('should wait for other store defined to finish first', function() {
+        $scope.$listenTo(MyStoreB, function() {
+          cb('MyStoreB');
+        });
+        $scope.$listenTo(MyStore, function() {
+          cb('MyStore');
+        });
+        cb.calls.reset();
+        flux.dispatch('addItem', { item: 'test' });
+        expect(cb.calls.argsFor(0)[0]).toEqual('MyStore');
+        expect(cb.calls.argsFor(1)[0]).toEqual('MyStoreB');
+      });
+
+      it('should throw an error when store waited for is not injected', function() {
+        expect(flux.dispatch.bind(flux, 'addItemWithBadWaitFor', 'foo')).toThrow();
+      });
+    });
+
+    describe('options', function() {
+      it('should allow local options to override immutable defaults', inject(function(MyStoreC) {
+        expect(flux.dispatcher.storeInstances.MyStore.state.options.asynchronous).toBe(false);
+        expect(flux.dispatcher.storeInstances.MyStoreC.state.options.asynchronous).toBe(true);
+      }));
+    });
   });
-
 });
 
