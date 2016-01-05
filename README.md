@@ -9,33 +9,14 @@ The `flux` service is exposed for dispatching actions using the [Yahoo Dispatchr
 `$scope.$listenTo` is exposed as a way to respond to changes in a store and sync them with the view-model.
 
 - [Releases](https://github.com/christianalfoni/flux-angular/releases)
-- [FAQ](#faq)
 - [Create a store](#create-a-store)
 - [Dispatch actions](#dispatch-actions)
 - [Wait for other stores to complete their handlers](#wait-for-other-stores-to-complete-their-handlers)
 - [Testing stores](#testing-stores)
 - [Performance](#performance)
+- [FAQ](#faq)
 - [Run project](#run-project)
 
-
-## FAQ
-
-#### PhantomJS gives me an error related to bind
-PhantomJS does not support ES5 `Function.prototype.bind`, but will in next
-version. Until then be sure to load the [ES5
-shim](https://github.com/es-shims/es5-shim) with your tests.
-
-#### Cannot call dispatch while another dispatch is executing
-This is a problem/feature that is generic to the flux architecture. It can be
-solved by having an action [dispatch multiple
-events](https://github.com/christianalfoni/flux-angular/issues/48).
-
-#### Did you really monkeypatch Angular?
-Yes. Angular has a beautiful API (except directives ;-) ) and I did not want
-flux-angular to feel like an alien syntax invasion, but rather it being a
-natural part of the Angular habitat. Angular 1.x is a stable codebase and I
-would be very surprised if this monkeypatch would be affected in later
-versions.
 
 ## Create a store
 
@@ -306,6 +287,25 @@ browser.addMockModule('protractorFixes', function() {
 ### Performance
 Any $scopes listening to stores are removed when the $scope is destroyed.
 Immutability (which uses `Object.freeze`) can be [disabled in production](#configuration).
+
+## FAQ
+
+#### PhantomJS gives me an error related to bind
+PhantomJS does not support ES5 `Function.prototype.bind`, but will in next
+version. Until then be sure to load the [ES5
+shim](https://github.com/es-shims/es5-shim) with your tests.
+
+#### Cannot call dispatch while another dispatch is executing
+This is a problem/feature that is generic to the flux architecture. It can be
+solved by having an action [dispatch multiple
+events](https://github.com/christianalfoni/flux-angular/issues/48).
+
+#### Did you really monkeypatch Angular?
+Yes. Angular has a beautiful API (except directives ;-) ) and I did not want
+flux-angular to feel like an alien syntax invasion, but rather it being a
+natural part of the Angular habitat. Angular 1.x is a stable codebase and I
+would be very surprised if this monkeypatch would be affected in later
+versions.
 
 ### Run project
 1. `npm install`
