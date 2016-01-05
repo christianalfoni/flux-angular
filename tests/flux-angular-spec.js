@@ -1,6 +1,6 @@
 describe('FLUX-ANGULAR', function() {
   describe('.store', function() {
-    var $scope, flux, cb, MyStore, MyStoreB;
+    let $scope, flux, cb, MyStore, MyStoreB;
 
     beforeEach(function() {
       angular.module('test', ['flux'])
@@ -193,11 +193,10 @@ describe('FLUX-ANGULAR', function() {
     });
 
     describe('options', function() {
-      it('should allow local options to override immutable defaults', inject(function(MyStoreC) {
+      it('should allow local options to override immutable defaults', inject(function(MyStoreC) { // eslint-disable-line no-unused-vars
         expect(flux.dispatcher.storeInstances.MyStore.state.options.asynchronous).toBe(false);
         expect(flux.dispatcher.storeInstances.MyStoreC.state.options.asynchronous).toBe(true);
       }));
     });
   });
 });
-

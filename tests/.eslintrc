@@ -1,0 +1,13 @@
+{
+  "extends": "../.eslintrc",
+  "env": {
+    "jasmine": true
+  },
+  "globals": {
+    "angular": true,
+    "inject": true
+  },
+  "rules": {
+    "object-shorthand": [3, "always"]
+  }
+}

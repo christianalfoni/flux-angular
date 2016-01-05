@@ -310,8 +310,7 @@ Immutability (which uses `Object.freeze`) can be [disabled in production](#confi
 ### Run project
 1. `npm install`
 2. `bower install`
-3. `gulp build`
-4. `npm test` and open browser at `http://localhost:9876/`
+3. `npm test` and open browser at `http://localhost:9876/`
 
 License
 -------
