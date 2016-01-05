@@ -35,6 +35,6 @@
   "dependencies": {
     "angular": "~1.2",
     "baobab": "^2.3.0",
-    "dispatchr": "^0.2.8"
+    "dispatchr": "^0.3.3"
   }
 }

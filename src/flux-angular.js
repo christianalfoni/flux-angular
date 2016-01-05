@@ -3,8 +3,7 @@ const angular = global.angular || require('angular') && global.angular;
 
 // Dependencies
 import Baobab from 'baobab';
-import dispatchr from 'dispatchr';
-const Dispatchr = dispatchr();
+import { createDispatcher } from 'dispatchr';
 
 const angularModule = angular.module;
 let registeredStores = [];
@@ -59,7 +58,8 @@ function createStore(name, spec = {}, immutableDefaults, flux) {
 // Flux Service is a wrapper for the Yahoo Dispatchr
 const FluxService = function (immutableDefaults) {
   this.stores = [];
-  this.dispatcher = new Dispatchr();
+  this.dispatcherInstance = createDispatcher();
+  this.dispatcher = this.dispatcherInstance.createContext();
 
   this.dispatch = function () {
     if (registeredStores.length) {
@@ -75,7 +75,7 @@ const FluxService = function (immutableDefaults) {
     // Create the exports object
     store.exports = {};
 
-    Dispatchr.registerStore(store);
+    this.dispatcherInstance.registerStore(store);
     this.stores.push(store);
 
     // Add cloning to exports
@@ -118,8 +118,8 @@ const FluxService = function (immutableDefaults) {
   };
 
   this.reset = function () {
-    Dispatchr.stores = {};
-    Dispatchr.handlers = {};
+    this.dispatcherInstance.stores = {};
+    this.dispatcherInstance.handlers = {};
     this.stores = [];
     registeredStores = [];
   };
