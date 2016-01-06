@@ -5,7 +5,7 @@
   "main": "./src/flux-angular.js",
   "scripts": {
     "build": "mkdirp build && browserify ./src/flux-angular.js -t [ babelify --presets [ es2015 ] ] -o ./build/flux-angular.js -x angular",
-    "deploy": "mkdirp build && npm run lint && browserify ./src/flux-angular.js -t [ babelify --presets [ es2015 ] ] -o ./release/flux-angular.js -x angular && uglifyjs ./release/flux-angular.js -c -m -o ./release/flux-angular.min.js",
+    "deploy": "npm run lint && browserify ./src/flux-angular.js -t [ babelify --presets [ es2015 ] ] -o ./release/flux-angular.js -x angular && uglifyjs ./release/flux-angular.js -c -m -o ./release/flux-angular.min.js",
     "lint": "eslint ./src ./test",
     "test": "karma start karma.conf.js"
   },
