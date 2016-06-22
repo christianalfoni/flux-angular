@@ -54,6 +54,7 @@ var coercePath = helpers.coercePath;
 var deepFreeze = helpers.deepFreeze;
 var getIn = helpers.getIn;
 var makeError = helpers.makeError;
+var deepClone = helpers.deepClone;
 var deepMerge = helpers.deepMerge;
 var shallowClone = helpers.shallowClone;
 var shallowMerge = helpers.shallowMerge;
@@ -223,16 +224,12 @@ var Baobab = (function (_Emitter) {
         }
       };
 
-      var register = [];
-
       var walk = function walk(data) {
         var p = arguments.length <= 1 || arguments[1] === undefined ? [] : arguments[1];
 
         // Should we sit a monkey in the tree?
         if (data instanceof _monkey.MonkeyDefinition || data instanceof _monkey.Monkey) {
           var monkeyInstance = new _monkey.Monkey(_this2, p, data instanceof _monkey.Monkey ? data.definition : data);
-
-          register.push(monkeyInstance);
 
           (0, _update3['default'])(_this2._monkeys, p, { type: 'set', value: monkeyInstance }, {
             immutable: false,
@@ -254,9 +251,6 @@ var Baobab = (function (_Emitter) {
       // Walking the whole tree
       if (!arguments.length) {
         walk(this._data);
-        register.forEach(function (m) {
-          return m.checkRecursivity();
-        });
       } else {
         var monkeysNode = getIn(this._monkeys, path).data;
 
@@ -266,9 +260,6 @@ var Baobab = (function (_Emitter) {
         // Let's walk the tree only from the updated point
         if (operation !== 'unset') {
           walk(node, path);
-          register.forEach(function (m) {
-            return m.checkRecursivity();
-          });
         }
       }
 
@@ -397,13 +388,18 @@ var Baobab = (function (_Emitter) {
 
       // If we merge data, we need to acknowledge monkeys
       var realOperation = operation;
-      if (/merge/.test(operation.type)) {
+      if (/merge/i.test(operation.type)) {
         var monkeysNode = getIn(this._monkeys, solvedPath).data;
 
         if (_type2['default'].object(monkeysNode)) {
+
+          // Cloning the operation not to create weird behavior for the user
           realOperation = shallowClone(realOperation);
 
-          if (/deep/.test(realOperation.type)) realOperation.value = deepMerge({}, monkeysNode, realOperation.value);else realOperation.value = shallowMerge({}, monkeysNode, realOperation.value);
+          // Fetching the existing node in the current data
+          var currentNode = getIn(this._data, solvedPath).data;
+
+          if (/deep/i.test(realOperation.type)) realOperation.value = deepMerge({}, deepMerge({}, currentNode, deepClone(monkeysNode)), realOperation.value);else realOperation.value = shallowMerge({}, deepMerge({}, currentNode, deepClone(monkeysNode)), realOperation.value);
         }
       }
 
@@ -497,6 +493,24 @@ var Baobab = (function (_Emitter) {
     }
 
     /**
+     * Method returning a monkey at the given path or else `null`.
+     *
+     * @param  {path}        path - Path of the monkey to retrieve.
+     * @return {Monkey|null}      - The Monkey instance of `null`.
+     */
+  }, {
+    key: 'getMonkey',
+    value: function getMonkey(path) {
+      path = coercePath(path);
+
+      var monkey = getIn(this._monkeys, [].concat(path)).data;
+
+      if (monkey instanceof _monkey.Monkey) return monkey;
+
+      return null;
+    }
+
+    /**
      * Method used to watch a collection of paths within the tree. Very useful
      * to bind UI components and such to the tree.
      *
@@ -587,7 +601,7 @@ Baobab.helpers = helpers;
 /**
  * Version
  */
-Baobab.VERSION = '2.3.0';
+Baobab.VERSION = '2.3.2';
 module.exports = exports['default'];
 },{"./cursor":2,"./helpers":3,"./monkey":4,"./type":5,"./update":6,"./watcher":7,"emmett":8}],2:[function(require,module,exports){
 /**
@@ -1687,7 +1701,7 @@ function cloneRegexp(re) {
  * @return {mixed}        - The cloned variable.
  */
 function cloner(deep, item) {
-  if (!item || typeof item !== 'object' || item instanceof Error || item instanceof _monkey.MonkeyDefinition || 'ArrayBuffer' in global && item instanceof ArrayBuffer) return item;
+  if (!item || typeof item !== 'object' || item instanceof Error || item instanceof _monkey.MonkeyDefinition || item instanceof _monkey.Monkey || 'ArrayBuffer' in global && item instanceof ArrayBuffer) return item;
 
   // Array
   if (_type2['default'].array(item)) {
@@ -1848,10 +1862,10 @@ exports.deepFreeze = deepFreeze;
  * @return {array}   result.solvedPath - The solved path or `null`.
  * @return {boolean} result.exists     - Does the path exists in the tree?
  */
-var notFoundObject = { data: undefined, solvedPath: null, exists: false };
+var NOT_FOUND_OBJECT = { data: undefined, solvedPath: null, exists: false };
 
 function getIn(object, path) {
-  if (!path) return notFoundObject;
+  if (!path) return NOT_FOUND_OBJECT;
 
   var solvedPath = [];
 
@@ -1862,23 +1876,27 @@ function getIn(object, path) {
       l = undefined;
 
   for (i = 0, l = path.length; i < l; i++) {
-    if (!c) return { data: undefined, solvedPath: path, exists: false };
+    if (!c) return {
+      data: undefined,
+      solvedPath: solvedPath.concat(path.slice(i)),
+      exists: false
+    };
 
     if (typeof path[i] === 'function') {
-      if (!_type2['default'].array(c)) return notFoundObject;
+      if (!_type2['default'].array(c)) return NOT_FOUND_OBJECT;
 
       idx = index(c, path[i]);
-      if (! ~idx) return notFoundObject;
+      if (! ~idx) return NOT_FOUND_OBJECT;
 
       solvedPath.push(idx);
       c = c[idx];
     } else if (typeof path[i] === 'object') {
-      if (!_type2['default'].array(c)) return notFoundObject;
+      if (!_type2['default'].array(c)) return NOT_FOUND_OBJECT;
 
       idx = index(c, function (e) {
         return compare(e, path[i]);
       });
-      if (! ~idx) return notFoundObject;
+      if (! ~idx) return NOT_FOUND_OBJECT;
 
       solvedPath.push(idx);
       c = c[idx];
@@ -1964,6 +1982,9 @@ exports.deepMerge = deepMerge;
 
 function solveRelativePath(base, to) {
   var solvedPath = [];
+
+  // Coercing to array
+  to = [].concat(to);
 
   for (var i = 0, l = to.length; i < l; i++) {
     var step = to[i];
@@ -2051,6 +2072,12 @@ function solveUpdate(affectedPaths, comparedPaths) {
 
 function splice(array, startIndex, nb) {
   nb = Math.max(0, nb);
+
+  // Solving startIndex
+  if (_type2['default']['function'](startIndex)) startIndex = index(array, startIndex);
+  if (_type2['default'].object(startIndex)) startIndex = index(array, function (e) {
+    return compare(e, startIndex);
+  });
 
   // Positive index
 
@@ -2150,6 +2177,12 @@ var MonkeyDefinition = function MonkeyDefinition(definition) {
     this.options = options;
   }
 
+  // Coercing paths for convenience
+  this.paths = this.paths.map(function (p) {
+    return [].concat(p);
+  });
+
+  // Does the definition contain dynamic paths
   this.hasDynamicPaths = this.paths.some(_type2['default'].dynamicPath);
 }
 
@@ -2174,7 +2207,6 @@ var Monkey = (function () {
     this.tree = tree;
     this.path = pathInTree;
     this.definition = definition;
-    this.isRecursive = false;
 
     // Adapting the definition's paths & projection to this monkey's case
     var projection = definition.projection,
@@ -2203,9 +2235,9 @@ var Monkey = (function () {
      *
      * When the tree writes, this listener will check whether the updated paths
      * are of any use to the monkey and, if so, will update the tree's node
-     * where the monkey sits with a lazy getter.
+     * where the monkey sits.
      */
-    this.listener = function (_ref) {
+    this.writeListener = function (_ref) {
       var path = _ref.data.path;
 
       if (_this2.state.killed) return;
@@ -2216,63 +2248,70 @@ var Monkey = (function () {
       if (concerned) _this2.update();
     };
 
-    // Binding listener
-    this.tree.on('write', this.listener);
+    /**
+     * Listener on the tree's `monkey` event.
+     *
+     * When another monkey updates, this listener will check whether the
+     * updated paths are of any use to the monkey and, if so, will update the
+     * tree's node where the monkey sits.
+     */
+    this.recursiveListener = function (_ref2) {
+      var _ref2$data = _ref2.data;
+      var monkey = _ref2$data.monkey;
+      var path = _ref2$data.path;
+
+      if (_this2.state.killed) return;
+
+      // Breaking if this is the same monkey
+      if (_this2 === monkey) return;
+
+      // Is the monkey affected by the current monkey event?
+      var concerned = (0, _helpers.solveUpdate)([path], _this2.relatedPaths(false));
+
+      if (concerned) _this2.update();
+    };
+
+    // Binding listeners
+    this.tree.on('write', this.writeListener);
+    this.tree.on('_monkey', this.recursiveListener);
 
     // Updating relevant node
     this.update();
   }
 
   /**
-   * Method triggering a recursivity check.
+   * Method returning solved paths related to the monkey.
    *
-   * @return {Monkey} - Returns itself for chaining purposes.
+   * @param  {boolean} recursive - Should we compute recursive paths?
+   * @return {array}             - An array of related paths.
    */
 
   _createClass(Monkey, [{
-    key: 'checkRecursivity',
-    value: function checkRecursivity() {
-      var _this3 = this;
-
-      this.isRecursive = this.depPaths.some(function (p) {
-        return !!_type2['default'].monkeyPath(_this3.tree._monkeys, p);
-      });
-
-      // Putting the recursive monkeys' listeners at the end of the stack
-      // NOTE: this is a dirty hack and a more thorough solution should be found
-      if (this.isRecursive) {
-        this.tree.off('write', this.listener);
-        this.tree.on('write', this.listener);
-      }
-
-      return this;
-    }
-
-    /**
-     * Method returning solved paths related to the monkey.
-     *
-     * @return {array} - An array of related paths.
-     */
-  }, {
     key: 'relatedPaths',
     value: function relatedPaths() {
-      var _this4 = this;
+      var _this3 = this;
+
+      var recursive = arguments.length <= 0 || arguments[0] === undefined ? true : arguments[0];
 
       var paths = undefined;
 
       if (this.definition.hasDynamicPaths) paths = this.depPaths.map(function (p) {
-        return (0, _helpers.getIn)(_this4.tree._data, p).solvedPath;
+        return (0, _helpers.getIn)(_this3.tree._data, p).solvedPath;
       });else paths = this.depPaths;
 
-      if (!this.isRecursive) return paths;
+      var isRecursive = recursive && this.depPaths.some(function (p) {
+        return !!_type2['default'].monkeyPath(_this3.tree._monkeys, p);
+      });
+
+      if (!isRecursive) return paths;
 
       return paths.reduce(function (accumulatedPaths, path) {
-        var monkeyPath = _type2['default'].monkeyPath(_this4.tree._monkeys, path);
+        var monkeyPath = _type2['default'].monkeyPath(_this3.tree._monkeys, path);
 
         if (!monkeyPath) return accumulatedPaths.concat([path]);
 
         // Solving recursive path
-        var relatedMonkey = (0, _helpers.getIn)(_this4.tree._monkeys, monkeyPath).data;
+        var relatedMonkey = (0, _helpers.getIn)(_this3.tree._monkeys, monkeyPath).data;
 
         return accumulatedPaths.concat(relatedMonkey.relatedPaths());
       }, []);
@@ -2327,6 +2366,9 @@ var Monkey = (function () {
         if ('data' in result) this.tree._data = result.data;
       }
 
+      // Notifying the monkey's update so we can handle recursivity
+      this.tree.emit('_monkey', { monkey: this, path: this.path });
+
       return this;
     }
 
@@ -2338,7 +2380,8 @@ var Monkey = (function () {
     value: function release() {
 
       // Unbinding events
-      this.tree.off('write', this.listener);
+      this.tree.off('write', this.writeListener);
+      this.tree.off('_monkey', this.monkeyListener);
       this.state.killed = true;
 
       // Deleting properties
@@ -4560,6 +4603,7 @@ var angular = global.angular || require('angular') && global.angular;
 
 // Dependencies
 
+
 var angularModule = angular.module;
 var registeredStores = [];
 var autoInjectStores = false;
@@ -4631,7 +4675,7 @@ var FluxService = function FluxService(immutableDefaults) {
 
   this.createStore = function (name, spec) {
     var store = createStore(name, spec, immutableDefaults, this);
-    var storeInstance = undefined;
+    var storeInstance = void 0;
 
     // Create the exports object
     store.exports = {};
@@ -4745,7 +4789,7 @@ angular.module('flux', []).provider('flux', function FluxProvider() {
 
   // Extend scopes with $listenTo
   $rootScope.constructor.prototype.$listenTo = function (storeExport, mapping, callback) {
-    var cursor = undefined;
+    var cursor = void 0;
     var store = flux.getStore(storeExport);
 
     if (!store.__tree) {
