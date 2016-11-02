@@ -66,6 +66,15 @@ angular.module('app', ['flux'])
 });
 ```
 
+You may also optionally have your `$listenTo` callbacks wrapped in `$applyAsync`. This can fix issues with
+these callbacks being called outside of a digest cycle:
+```javascript
+angular.module('app', ['flux'])
+.config(function (fluxProvider) {
+  fluxProvider.useApplyAsync(true);
+});
+```
+
 ### Create a store
 ```javascript
 angular.module('app', ['flux'])
