@@ -4607,7 +4607,7 @@ var angular = global.angular || require('angular') && global.angular;
 var angularModule = angular.module;
 var registeredStores = [];
 var autoInjectStores = false;
-var useApplyAsync = false;
+var useEvalAsync = false;
 
 // A function that creates stores
 function createStore(name) {
@@ -4776,8 +4776,8 @@ angular.module('flux', []).provider('flux', function FluxProvider() {
     autoInjectStores = val;
   };
 
-  this.useApplyAsync = function (val) {
-    useApplyAsync = val;
+  this.useEvalAsync = function (val) {
+    useEvalAsync = val;
   };
 
   this.$get = [function fluxFactory() {
@@ -4810,11 +4810,11 @@ angular.module('flux', []).provider('flux', function FluxProvider() {
       cursor = store.__tree.select(mapping);
     }
 
-    if (useApplyAsync) {
+    if (useEvalAsync) {
       (function () {
         var originalCallback = callback;
         callback = function callback(e) {
-          _this.$applyAsync(function () {
+          _this.$evalAsync(function () {
             return originalCallback(e);
           });
         };
