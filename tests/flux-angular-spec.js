@@ -8,7 +8,7 @@ describe('FLUX-ANGULAR', function() {
       angular.module('test', ['flux'])
         .config(function (fluxProvider) {
           fluxProvider.setImmutableDefaults({ asynchronous: false });
-          fluxProvider.useApplyAsync(options.useApplyAsync);
+          fluxProvider.useEvalAsync(options.useEvalAsync);
         })
         .store('MyStore', function() {
           return {
@@ -84,7 +84,7 @@ describe('FLUX-ANGULAR', function() {
 
     describe('with default fluxProvider options', function () {
       beforeEach(function() {
-        initialize({ useApplyAsync: false });
+        initialize({ useEvalAsync: false });
       });
 
       beforeEach(inject(function($rootScope, _MyStore_, _MyStoreB_, _flux_) {
@@ -208,11 +208,11 @@ describe('FLUX-ANGULAR', function() {
       });
     });
 
-    describe('when useApplyAsync = true', function () {
+    describe('when useEvalAsync = true', function () {
       let $rootScope, $scope, $browser, MyStore, cb, flux;
 
       beforeEach(function() {
-        initialize({ useApplyAsync: true });
+        initialize({ useEvalAsync: true });
       });
 
       beforeEach(inject(function(_$rootScope_, _$browser_, _MyStore_, _flux_) {
@@ -221,13 +221,13 @@ describe('FLUX-ANGULAR', function() {
         $browser = _$browser_;
         MyStore = _MyStore_;
         flux = _flux_;
-        spyOn($rootScope, '$applyAsync').and.callThrough();
+        spyOn($rootScope, '$evalAsync').and.callThrough();
         cb = jasmine.createSpy('callback');
       }));
 
-      it('should call $applyAsync and then the callback when $listenTo is first attached', function() {
+      it('should call $evalAsync and then the callback when $listenTo is first attached', function() {
         $scope.$listenTo(MyStore, cb);
-        expect($scope.$applyAsync.calls.count()).toEqual(1);
+        expect($scope.$evalAsync.calls.count()).toEqual(1);
         expect(cb.calls.count()).toEqual(0);
         $browser.defer.flush();
         expect(cb.calls.count()).toEqual(1);
@@ -238,19 +238,19 @@ describe('FLUX-ANGULAR', function() {
           $scope.$listenTo(MyStore, cb);
           $browser.defer.flush();
           cb.calls.reset();
-          $scope.$applyAsync.calls.reset();
+          $scope.$evalAsync.calls.reset();
         });
 
-        it('should call $applyAsync and then the callback when state is changed on any part of the tree', function() {
+        it('should call $evalAsync and then the callback when state is changed on any part of the tree', function() {
           flux.dispatch('addItem', { item: 'foo' });
-          expect($scope.$applyAsync.calls.count()).toEqual(1);
+          expect($scope.$evalAsync.calls.count()).toEqual(1);
           expect(cb.calls.count()).toEqual(0);
           $browser.defer.flush();
           expect(cb.calls.count()).toEqual(1);
 
           flux.dispatch('setName', { name: 'bar' });
           expect(cb.calls.count()).toEqual(1);
-          expect($scope.$applyAsync.calls.count()).toEqual(2);
+          expect($scope.$evalAsync.calls.count()).toEqual(2);
           $browser.defer.flush();
           expect(cb.calls.count()).toEqual(2);
         });
