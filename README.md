@@ -66,12 +66,12 @@ angular.module('app', ['flux'])
 });
 ```
 
-You may also optionally have your `$listenTo` callbacks wrapped in `$evalAsync`. This can fix issues with
-these callbacks being called outside of a digest cycle:
+By default, your `$listenTo` callbacks will be wrapped in `$evalAsync` to ensure they are executed as part
+of a digest cycle. You can turn this off like this:
 ```javascript
 angular.module('app', ['flux'])
 .config(function (fluxProvider) {
-  fluxProvider.useEvalAsync(true);
+  fluxProvider.useEvalAsync(false);
 });
 ```
 
