@@ -8,7 +8,7 @@ import { createDispatcher } from 'dispatchr';
 const angularModule = angular.module;
 let registeredStores = [];
 let autoInjectStores = false;
-let useEvalAsync = false;
+let useEvalAsync = true;
 
 // A function that creates stores
 function createStore(name, spec = {}, immutableDefaults, flux) {

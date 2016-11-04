@@ -1,6 +1,6 @@
 describe('FLUX-ANGULAR', function() {
   describe('.store', function() {
-    let $scope, flux, cb, MyStore, MyStoreB;
+    let $scope, flux, cb, MyStore, MyStoreB, $browser;
 
     function initialize (options) {
       options = options || {};
@@ -8,7 +8,9 @@ describe('FLUX-ANGULAR', function() {
       angular.module('test', ['flux'])
         .config(function (fluxProvider) {
           fluxProvider.setImmutableDefaults({ asynchronous: false });
-          fluxProvider.useEvalAsync(options.useEvalAsync);
+          if(angular.isDefined(options.useEvalAsync)) {
+            fluxProvider.useEvalAsync(options.useEvalAsync);
+          }
         })
         .store('MyStore', function() {
           return {
@@ -84,13 +86,15 @@ describe('FLUX-ANGULAR', function() {
 
     describe('with default fluxProvider options', function () {
       beforeEach(function() {
-        initialize({ useEvalAsync: false });
+        initialize();
       });
 
-      beforeEach(inject(function($rootScope, _MyStore_, _MyStoreB_, _flux_) {
+      beforeEach(inject(function($rootScope, _MyStore_, _MyStoreB_, _flux_, _$browser_) {
         MyStore = _MyStore_;
         MyStoreB = _MyStoreB_;
         flux = _flux_;
+        $browser = _$browser_;
+        spyOn($rootScope, '$evalAsync').and.callThrough();
         $scope = $rootScope.$new();
         cb = jasmine.createSpy('callback');
       }));
@@ -111,6 +115,7 @@ describe('FLUX-ANGULAR', function() {
           $scope.$listenTo(MyStore, cb);
           flux.dispatcher.storeInstances.MyStore.initialize();
           flux.dispatch('addItem', { item: 'foo' });
+          $browser.defer.flush();
           expect(cb.calls.count()).toEqual(3); // once for initialization, once for state reset, and once for addItem
         });
       });
@@ -148,35 +153,64 @@ describe('FLUX-ANGULAR', function() {
           expect($scope.$listenTo).toBeDefined();
         });
 
-        it('should call the callback when $listenTo is first attached so that the view-model is initialized', function() {
+        it('should call $evalAsync and then the callback when $listenTo is first attached so that the view-model is initialized', function() {
           $scope.$listenTo(MyStore, cb);
+          expect($scope.$evalAsync.calls.count()).toEqual(1);
+          expect(cb.calls.count()).toEqual(0);
+          $browser.defer.flush();
+
           expect(cb.calls.count()).toEqual(1);
           expect(cb.calls.argsFor(0)[0]).toEqual({});
         });
 
-        it('should call the callback when state is changed on any part of the tree', function() {
+        it('should call $evalAsync and the callback when state is changed on any part of the tree', function() {
           $scope.$listenTo(MyStore, cb);
+          $browser.defer.flush();
           cb.calls.reset();
+          $scope.$evalAsync.calls.reset();
+
           flux.dispatch('addItem', { item: 'foo' });
+          expect($scope.$evalAsync.calls.count()).toEqual(1);
+          expect(cb.calls.count()).toEqual(0);
+          $browser.defer.flush();
+
           expect(cb.calls.count()).toEqual(1);
           flux.dispatch('setName', { name: 'bar' });
+          expect($scope.$evalAsync.calls.count()).toEqual(2);
+          $browser.defer.flush();
+
           expect(cb.calls.count()).toEqual(2);
         });
 
         it('should call the callback if a specific cursor is listened to and changed', function() {
           $scope.$listenTo(MyStore, ['items'], cb);
+          $browser.defer.flush();
           cb.calls.reset();
+          $scope.$evalAsync.calls.reset();
+
           flux.dispatch('addItem', { item: 'foo' });
+          expect($scope.$evalAsync.calls.count()).toEqual(1);
+          $browser.defer.flush();
+
           expect(cb.calls.count()).toEqual(1);
+
           flux.dispatch('setName', { name: 'bar' });
+          expect($scope.$evalAsync.calls.count()).toEqual(1);
           expect(cb.calls.count()).toEqual(1);
         });
 
         it('should remove the listener when the scope is destroyed', function() {
           $scope.$listenTo(MyStore, ['items'], cb);
+          $browser.defer.flush();
           cb.calls.reset();
+          $scope.$evalAsync.calls.reset();
+
+          // need to keep a ref to evalAsync since it is removed when the scope is destroyed
+          const evalAsync = $scope.$evalAsync;
           $scope.$destroy();
+
           flux.dispatch('addItem', { item: 'foo' });
+          expect(evalAsync.calls.count()).toEqual(0);
           expect(cb.calls.count()).toEqual(0);
         });
       });
@@ -189,8 +223,11 @@ describe('FLUX-ANGULAR', function() {
           $scope.$listenTo(MyStore, function() {
             cb('MyStore');
           });
+          $browser.defer.flush();
           cb.calls.reset();
+
           flux.dispatch('addItem', { item: 'test' });
+          $browser.defer.flush();
           expect(cb.calls.argsFor(0)[0]).toEqual('MyStore');
           expect(cb.calls.argsFor(1)[0]).toEqual('MyStoreB');
         });
@@ -208,11 +245,11 @@ describe('FLUX-ANGULAR', function() {
       });
     });
 
-    describe('when useEvalAsync = true', function () {
+    describe('when useEvalAsync = false', function () {
       let $rootScope, $scope, $browser, MyStore, cb, flux;
 
       beforeEach(function() {
-        initialize({ useEvalAsync: true });
+        initialize({ useEvalAsync: false });
       });
 
       beforeEach(inject(function(_$rootScope_, _$browser_, _MyStore_, _flux_) {
@@ -225,47 +262,35 @@ describe('FLUX-ANGULAR', function() {
         cb = jasmine.createSpy('callback');
       }));
 
-      it('should call $evalAsync and then the callback when $listenTo is first attached', function() {
+      afterEach(function () {
+        expect($scope.$evalAsync.calls.count()).toEqual(0);
+      });
+
+      it('should call the callback when $listenTo is first attached', function() {
         $scope.$listenTo(MyStore, cb);
-        expect($scope.$evalAsync.calls.count()).toEqual(1);
-        expect(cb.calls.count()).toEqual(0);
-        $browser.defer.flush();
         expect(cb.calls.count()).toEqual(1);
       });
 
       describe('after first attachment', function() {
         beforeEach(function() {
           $scope.$listenTo(MyStore, cb);
-          $browser.defer.flush();
           cb.calls.reset();
-          $scope.$evalAsync.calls.reset();
         });
 
-        it('should call $evalAsync and then the callback when state is changed on any part of the tree', function() {
+        it('should call the callback when state is changed on any part of the tree', function() {
           flux.dispatch('addItem', { item: 'foo' });
-          expect($scope.$evalAsync.calls.count()).toEqual(1);
-          expect(cb.calls.count()).toEqual(0);
-          $browser.defer.flush();
           expect(cb.calls.count()).toEqual(1);
 
           flux.dispatch('setName', { name: 'bar' });
-          expect(cb.calls.count()).toEqual(1);
-          expect($scope.$evalAsync.calls.count()).toEqual(2);
-          $browser.defer.flush();
           expect(cb.calls.count()).toEqual(2);
         });
 
         it('should group multiple callback calls within a short timeframe into one $apply', function() {
           let cb2 = jasmine.createSpy('callback2');
           $scope.$listenTo(MyStore, cb2);
-          $browser.defer.flush();
           cb2.calls.reset();
 
           flux.dispatch('setName', { name: 'bar '});
-          expect(cb.calls.count()).toEqual(0);
-          expect(cb2.calls.count()).toEqual(0);
-
-          $browser.defer.flush();
           expect(cb.calls.count()).toEqual(1);
           expect(cb2.calls.count()).toEqual(1);
         });
