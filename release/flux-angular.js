@@ -4607,7 +4607,7 @@ var angular = global.angular || require('angular') && global.angular;
 var angularModule = angular.module;
 var registeredStores = [];
 var autoInjectStores = false;
-var useEvalAsync = false;
+var useEvalAsync = true;
 
 // A function that creates stores
 function createStore(name) {
