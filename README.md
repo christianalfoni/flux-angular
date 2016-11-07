@@ -66,6 +66,15 @@ angular.module('app', ['flux'])
 });
 ```
 
+By default, your `$listenTo` callbacks will be wrapped in `$evalAsync` to ensure they are executed as part
+of a digest cycle. You can turn this off like this:
+```javascript
+angular.module('app', ['flux'])
+.config(function (fluxProvider) {
+  fluxProvider.useEvalAsync(false);
+});
+```
+
 ### Create a store
 ```javascript
 angular.module('app', ['flux'])

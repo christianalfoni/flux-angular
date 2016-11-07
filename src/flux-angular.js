@@ -8,6 +8,7 @@ import { createDispatcher } from 'dispatchr';
 const angularModule = angular.module;
 let registeredStores = [];
 let autoInjectStores = false;
+let useEvalAsync = true;
 
 // A function that creates stores
 function createStore(name, spec = {}, immutableDefaults, flux) {
@@ -165,6 +166,10 @@ angular.module('flux', [])
       autoInjectStores = val;
     };
 
+    this.useEvalAsync = function(val) {
+      useEvalAsync = val;
+    };
+
     this.$get = [function fluxFactory () {
       return new FluxService(immutableDefaults);
     }];
@@ -192,6 +197,13 @@ angular.module('flux', [])
         cursor = store.__tree;
       } else {
         cursor = store.__tree.select(mapping);
+      }
+
+      if (useEvalAsync) {
+        const originalCallback = callback;
+        callback = (e) => {
+          this.$evalAsync(() => originalCallback(e));
+        };
       }
 
       cursor.on('update', callback);

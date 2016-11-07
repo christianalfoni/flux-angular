@@ -603,7 +603,7 @@ Baobab.helpers = helpers;
  */
 Baobab.VERSION = '2.3.2';
 module.exports = exports['default'];
-},{"./cursor":2,"./helpers":3,"./monkey":4,"./type":5,"./update":6,"./watcher":7,"emmett":8}],2:[function(require,module,exports){
+},{"./cursor":2,"./helpers":3,"./monkey":4,"./type":5,"./update":6,"./watcher":7,"emmett":14}],2:[function(require,module,exports){
 /**
  * Baobab Cursors
  * ===============
@@ -1489,7 +1489,7 @@ makeSetter('splice', _type2['default'].splicer);
 makeSetter('merge', _type2['default'].object);
 makeSetter('deepMerge', _type2['default'].object);
 module.exports = exports['default'];
-},{"./helpers":3,"./monkey":4,"./type":5,"emmett":8}],3:[function(require,module,exports){
+},{"./helpers":3,"./monkey":4,"./type":5,"emmett":14}],3:[function(require,module,exports){
 (function (global){
 /* eslint eqeqeq: 0 */
 
@@ -3060,7 +3060,786 @@ var Watcher = (function (_Emitter) {
 
 exports['default'] = Watcher;
 module.exports = exports['default'];
-},{"./cursor":2,"./helpers":3,"./type":5,"emmett":8}],8:[function(require,module,exports){
+},{"./cursor":2,"./helpers":3,"./type":5,"emmett":14}],8:[function(require,module,exports){
+
+/**
+ * This is the web browser implementation of `debug()`.
+ *
+ * Expose `debug()` as the module.
+ */
+
+exports = module.exports = require('./debug');
+exports.log = log;
+exports.formatArgs = formatArgs;
+exports.save = save;
+exports.load = load;
+exports.useColors = useColors;
+exports.storage = 'undefined' != typeof chrome
+               && 'undefined' != typeof chrome.storage
+                  ? chrome.storage.local
+                  : localstorage();
+
+/**
+ * Colors.
+ */
+
+exports.colors = [
+  'lightseagreen',
+  'forestgreen',
+  'goldenrod',
+  'dodgerblue',
+  'darkorchid',
+  'crimson'
+];
+
+/**
+ * Currently only WebKit-based Web Inspectors, Firefox >= v31,
+ * and the Firebug extension (any Firefox version) are known
+ * to support "%c" CSS customizations.
+ *
+ * TODO: add a `localStorage` variable to explicitly enable/disable colors
+ */
+
+function useColors() {
+  // is webkit? http://stackoverflow.com/a/16459606/376773
+  return ('WebkitAppearance' in document.documentElement.style) ||
+    // is firebug? http://stackoverflow.com/a/398120/376773
+    (window.console && (console.firebug || (console.exception && console.table))) ||
+    // is firefox >= v31?
+    // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
+    (navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31);
+}
+
+/**
+ * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
+ */
+
+exports.formatters.j = function(v) {
+  return JSON.stringify(v);
+};
+
+
+/**
+ * Colorize log arguments if enabled.
+ *
+ * @api public
+ */
+
+function formatArgs() {
+  var args = arguments;
+  var useColors = this.useColors;
+
+  args[0] = (useColors ? '%c' : '')
+    + this.namespace
+    + (useColors ? ' %c' : ' ')
+    + args[0]
+    + (useColors ? '%c ' : ' ')
+    + '+' + exports.humanize(this.diff);
+
+  if (!useColors) return args;
+
+  var c = 'color: ' + this.color;
+  args = [args[0], c, 'color: inherit'].concat(Array.prototype.slice.call(args, 1));
+
+  // the final "%c" is somewhat tricky, because there could be other
+  // arguments passed either before or after the %c, so we need to
+  // figure out the correct index to insert the CSS into
+  var index = 0;
+  var lastC = 0;
+  args[0].replace(/%[a-z%]/g, function(match) {
+    if ('%%' === match) return;
+    index++;
+    if ('%c' === match) {
+      // we only are interested in the *last* %c
+      // (the user may have provided their own)
+      lastC = index;
+    }
+  });
+
+  args.splice(lastC, 0, c);
+  return args;
+}
+
+/**
+ * Invokes `console.log()` when available.
+ * No-op when `console.log` is not a "function".
+ *
+ * @api public
+ */
+
+function log() {
+  // this hackery is required for IE8/9, where
+  // the `console.log` function doesn't have 'apply'
+  return 'object' === typeof console
+    && console.log
+    && Function.prototype.apply.call(console.log, console, arguments);
+}
+
+/**
+ * Save `namespaces`.
+ *
+ * @param {String} namespaces
+ * @api private
+ */
+
+function save(namespaces) {
+  try {
+    if (null == namespaces) {
+      exports.storage.removeItem('debug');
+    } else {
+      exports.storage.debug = namespaces;
+    }
+  } catch(e) {}
+}
+
+/**
+ * Load `namespaces`.
+ *
+ * @return {String} returns the previously persisted debug modes
+ * @api private
+ */
+
+function load() {
+  var r;
+  try {
+    r = exports.storage.debug;
+  } catch(e) {}
+  return r;
+}
+
+/**
+ * Enable namespaces listed in `localStorage.debug` initially.
+ */
+
+exports.enable(load());
+
+/**
+ * Localstorage attempts to return the localstorage.
+ *
+ * This is necessary because safari throws
+ * when a user disables cookies/localstorage
+ * and you attempt to access it.
+ *
+ * @return {LocalStorage}
+ * @api private
+ */
+
+function localstorage(){
+  try {
+    return window.localStorage;
+  } catch (e) {}
+}
+
+},{"./debug":9}],9:[function(require,module,exports){
+
+/**
+ * This is the common logic for both the Node.js and web browser
+ * implementations of `debug()`.
+ *
+ * Expose `debug()` as the module.
+ */
+
+exports = module.exports = debug;
+exports.coerce = coerce;
+exports.disable = disable;
+exports.enable = enable;
+exports.enabled = enabled;
+exports.humanize = require('ms');
+
+/**
+ * The currently active debug mode names, and names to skip.
+ */
+
+exports.names = [];
+exports.skips = [];
+
+/**
+ * Map of special "%n" handling functions, for the debug "format" argument.
+ *
+ * Valid key names are a single, lowercased letter, i.e. "n".
+ */
+
+exports.formatters = {};
+
+/**
+ * Previously assigned color.
+ */
+
+var prevColor = 0;
+
+/**
+ * Previous log timestamp.
+ */
+
+var prevTime;
+
+/**
+ * Select a color.
+ *
+ * @return {Number}
+ * @api private
+ */
+
+function selectColor() {
+  return exports.colors[prevColor++ % exports.colors.length];
+}
+
+/**
+ * Create a debugger with the given `namespace`.
+ *
+ * @param {String} namespace
+ * @return {Function}
+ * @api public
+ */
+
+function debug(namespace) {
+
+  // define the `disabled` version
+  function disabled() {
+  }
+  disabled.enabled = false;
+
+  // define the `enabled` version
+  function enabled() {
+
+    var self = enabled;
+
+    // set `diff` timestamp
+    var curr = +new Date();
+    var ms = curr - (prevTime || curr);
+    self.diff = ms;
+    self.prev = prevTime;
+    self.curr = curr;
+    prevTime = curr;
+
+    // add the `color` if not set
+    if (null == self.useColors) self.useColors = exports.useColors();
+    if (null == self.color && self.useColors) self.color = selectColor();
+
+    var args = Array.prototype.slice.call(arguments);
+
+    args[0] = exports.coerce(args[0]);
+
+    if ('string' !== typeof args[0]) {
+      // anything else let's inspect with %o
+      args = ['%o'].concat(args);
+    }
+
+    // apply any `formatters` transformations
+    var index = 0;
+    args[0] = args[0].replace(/%([a-z%])/g, function(match, format) {
+      // if we encounter an escaped % then don't increase the array index
+      if (match === '%%') return match;
+      index++;
+      var formatter = exports.formatters[format];
+      if ('function' === typeof formatter) {
+        var val = args[index];
+        match = formatter.call(self, val);
+
+        // now we need to remove `args[index]` since it's inlined in the `format`
+        args.splice(index, 1);
+        index--;
+      }
+      return match;
+    });
+
+    if ('function' === typeof exports.formatArgs) {
+      args = exports.formatArgs.apply(self, args);
+    }
+    var logFn = enabled.log || exports.log || console.log.bind(console);
+    logFn.apply(self, args);
+  }
+  enabled.enabled = true;
+
+  var fn = exports.enabled(namespace) ? enabled : disabled;
+
+  fn.namespace = namespace;
+
+  return fn;
+}
+
+/**
+ * Enables a debug mode by namespaces. This can include modes
+ * separated by a colon and wildcards.
+ *
+ * @param {String} namespaces
+ * @api public
+ */
+
+function enable(namespaces) {
+  exports.save(namespaces);
+
+  var split = (namespaces || '').split(/[\s,]+/);
+  var len = split.length;
+
+  for (var i = 0; i < len; i++) {
+    if (!split[i]) continue; // ignore empty strings
+    namespaces = split[i].replace(/\*/g, '.*?');
+    if (namespaces[0] === '-') {
+      exports.skips.push(new RegExp('^' + namespaces.substr(1) + '$'));
+    } else {
+      exports.names.push(new RegExp('^' + namespaces + '$'));
+    }
+  }
+}
+
+/**
+ * Disable debug output.
+ *
+ * @api public
+ */
+
+function disable() {
+  exports.enable('');
+}
+
+/**
+ * Returns true if the given mode name is enabled, false otherwise.
+ *
+ * @param {String} name
+ * @return {Boolean}
+ * @api public
+ */
+
+function enabled(name) {
+  var i, len;
+  for (i = 0, len = exports.skips.length; i < len; i++) {
+    if (exports.skips[i].test(name)) {
+      return false;
+    }
+  }
+  for (i = 0, len = exports.names.length; i < len; i++) {
+    if (exports.names[i].test(name)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Coerce `val`.
+ *
+ * @param {Mixed} val
+ * @return {Mixed}
+ * @api private
+ */
+
+function coerce(val) {
+  if (val instanceof Error) return val.stack || val.message;
+  return val;
+}
+
+},{"ms":15}],10:[function(require,module,exports){
+/**
+ * Copyright 2014, Yahoo! Inc.
+ * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+module.exports = require('./lib/Dispatcher');
+
+},{"./lib/Dispatcher":12}],11:[function(require,module,exports){
+/**
+ * Copyright 2014, Yahoo! Inc.
+ * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+'use strict';
+var debug = require('debug')('Dispatchr:Action');
+
+function Action(name, payload) {
+    this.name = name;
+    this.payload = payload;
+    this._handlers = null;
+    this._isExecuting = false;
+    this._isCompleted = null;
+}
+
+/**
+ * Gets a name from a store
+ * @method getStoreName
+ * @param {String|Object} store The store name or class from which to extract
+ *      the name
+ * @returns {String}
+ */
+Action.prototype.getStoreName = function getStoreName(store) {
+    if ('string' === typeof store) {
+        return store;
+    }
+    return store.storeName;
+};
+
+/**
+ * Executes all handlers for the action
+ * @method execute
+ * @param {Function[]} handlers A mapping of store names to handler function
+ * @throws {Error} if action has already been executed
+ */
+Action.prototype.execute = function execute(handlers) {
+    if (this._isExecuting) {
+        throw new Error('Action is already dispatched');
+    }
+    var self = this;
+    this._handlers = handlers;
+    this._isExecuting = true;
+    this._isCompleted = {};
+    Object.keys(handlers).forEach(function handlersEach(storeName) {
+        self._callHandler(storeName);
+    });
+};
+
+/**
+ * Calls an individual store's handler function
+ * @method _callHandler
+ * @param {String} storeName
+ * @private
+ * @throws {Error} if handler does not exist for storeName
+ */
+Action.prototype._callHandler = function callHandler(storeName) {
+    var self = this,
+        handlerFn = self._handlers[storeName];
+    if (!handlerFn) {
+        throw new Error(storeName + ' does not have a handler for action ' + self.name);
+    }
+    if (self._isCompleted[storeName]) {
+        return;
+    }
+    self._isCompleted[storeName] = false;
+    debug('executing handler for ' + storeName);
+    handlerFn(self.payload, self.name);
+    self._isCompleted[storeName] = true;
+};
+
+/**
+ * Waits until all stores have finished handling an action and then calls
+ * the callback
+ * @method waitFor
+ * @param {String|String[]|Constructor|Constructor[]} stores An array of stores as strings or constructors to wait for
+ * @param {Function} callback Called after all stores have completed handling their actions
+ * @throws {Error} if the action is not being executed
+ */
+Action.prototype.waitFor = function waitFor(stores, callback) {
+    var self = this;
+    if (!self._isExecuting) {
+        throw new Error('waitFor called even though there is no action being executed!');
+    }
+    if (!Array.isArray(stores)) {
+        stores = [stores];
+    }
+
+    debug('waiting on ' + stores.join(', '));
+    stores.forEach(function storesEach(storeName) {
+        storeName = self.getStoreName(storeName);
+        if (self._handlers[storeName]) {
+            self._callHandler(storeName);
+        }
+    });
+
+    callback();
+};
+
+module.exports = Action;
+
+},{"debug":8}],12:[function(require,module,exports){
+(function (process){
+/**
+ * Copyright 2014, Yahoo! Inc.
+ * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+'use strict';
+
+var Action = require('./Action');
+var DEFAULT = 'default';
+var DispatcherContext = require('./DispatcherContext');
+
+/**
+ * @class Dispatcher
+ * @param {Object} options Dispatcher options
+ * @param {Array} options.stores Array of stores to register
+ * @constructor
+ */
+function Dispatcher (options) {
+    options = options || {};
+    options.stores = options.stores || [];
+    this.stores = {};
+    this.handlers = {};
+    this.handlers[DEFAULT] = [];
+    this.hasWarnedAboutNameProperty = false;
+    options.stores.forEach(function (store) {
+        this.registerStore(store);
+    }, this);
+
+}
+
+Dispatcher.prototype.createContext = function createContext(context) {
+    return new DispatcherContext(this, context);
+};
+
+/**
+ * Registers a store so that it can handle actions.
+ * @method registerStore
+ * @static
+ * @param {Object} store A store class to be registered. The store should have a static
+ *      `name` property so that it can be loaded later.
+ * @throws {Error} if store is invalid
+ * @throws {Error} if store is already registered
+ */
+Dispatcher.prototype.registerStore = function registerStore(store) {
+    if ('function' !== typeof store) {
+        throw new Error('registerStore requires a constructor as first parameter');
+    }
+    var storeName = this.getStoreName(store);
+    if (!storeName) {
+        throw new Error('Store is required to have a `storeName` property.');
+    }
+    if (this.stores[storeName]) {
+        if (this.stores[storeName] === store) {
+            // Store is already registered, nothing to do
+            return;
+        }
+        throw new Error('Store with name `' + storeName + '` has already been registered.');
+    }
+    this.stores[storeName] = store;
+    if (store.handlers) {
+        Object.keys(store.handlers).forEach(function storeHandlersEach(action) {
+            var handler = store.handlers[action];
+            this._registerHandler(action, storeName, handler);
+        }, this);
+    }
+};
+
+/**
+ * Method to discover if a storeName has been registered
+ * @method isRegistered
+ * @static
+ * @param {Object|String} store The store to check
+ * @returns {boolean}
+ */
+Dispatcher.prototype.isRegistered = function isRegistered(store) {
+    var storeName = this.getStoreName(store),
+        storeInstance = this.stores[storeName];
+
+    if (!storeInstance) {
+        return false;
+    }
+
+    if ('function' === typeof store) {
+        if (store !== storeInstance) {
+            return false;
+        }
+    }
+    return true;
+};
+
+/**
+ * Gets a name from a store
+ * @method getStoreName
+ * @static
+ * @param {String|Object} store The store name or class from which to extract
+ *      the name
+ * @returns {String}
+ */
+Dispatcher.prototype.getStoreName = function getStoreName(store) {
+    if ('string' === typeof store) {
+        return store;
+    }
+    if (store.storeName) {
+        return store.storeName;
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+        if (store.name && !this.hasWarnedAboutNameProperty) {
+            console.warn('A store has been registered that relies on the ' +
+                'constructor\'s name property. This name may change when you ' +
+                'minify your stores during build time and could break string ' +
+                'references to your store. It is advised that you add a ' +
+                'static `storeName` property to your store to ensure the ' +
+                'store name does not change during your build.');
+            this.hasWarnedAboutNameProperty = true;
+        }
+    }
+    return store.name;
+};
+
+/**
+ * Adds a handler function to be called for the given action
+ * @method registerHandler
+ * @private
+ * @static
+ * @param {String} action Name of the action
+ * @param {String} name Name of the store that handles the action
+ * @param {String|Function} handler The function or name of the method that handles the action
+ * @returns {number}
+ */
+Dispatcher.prototype._registerHandler = function registerHandler(action, name, handler) {
+    this.handlers[action] = this.handlers[action] || [];
+    this.handlers[action].push({
+        name: this.getStoreName(name),
+        handler: handler
+    });
+    return this.handlers.length - 1;
+};
+
+module.exports = {
+    createDispatcher: function (options) {
+        return new Dispatcher(options);
+    }
+};
+
+}).call(this,require('_process'))
+},{"./Action":11,"./DispatcherContext":13,"_process":16}],13:[function(require,module,exports){
+/**
+ * Copyright 2014, Yahoo! Inc.
+ * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+ */
+'use strict';
+
+var Action = require('./Action');
+var DEFAULT = 'default';
+var debug = require('debug')('Dispatchr:DispatcherContext');
+
+/**
+ * @class Dispatcher
+ * @param {Object} context The context to be used for store instances
+ * @constructor
+ */
+function DispatcherContext (dispatcher, context) {
+    this.dispatcher = dispatcher;
+    this.storeInstances = {};
+    this.currentAction = null;
+    this.dispatcherInterface = {
+        getContext: function getContext() { return context; },
+        getStore: this.getStore.bind(this),
+        waitFor: this.waitFor.bind(this)
+    };
+}
+
+/**
+ * Returns a single store instance and creates one if it doesn't already exist
+ * @method getStore
+ * @param {String} name The name of the instance
+ * @returns {Object} The store instance
+ * @throws {Error} if store is not registered
+ */
+DispatcherContext.prototype.getStore = function getStore(name) {
+    var storeName = this.dispatcher.getStoreName(name);
+    if (!this.storeInstances[storeName]) {
+        var Store = this.dispatcher.stores[storeName];
+        if (!Store) {
+            throw new Error('Store ' + storeName + ' was not registered.');
+        }
+        this.storeInstances[storeName] = new (this.dispatcher.stores[storeName])(this.dispatcherInterface);
+    }
+    return this.storeInstances[storeName];
+};
+
+/**
+ * Dispatches a new action or queues it up if one is already in progress
+ * @method dispatch
+ * @param {String} actionName Name of the action to be dispatched
+ * @param {Object} payload Parameters to describe the action
+ * @throws {Error} if store has handler registered that does not exist
+ */
+DispatcherContext.prototype.dispatch = function dispatch(actionName, payload) {
+    if (!actionName) {
+        throw new Error('actionName parameter `' + actionName + '` is invalid.');
+    }
+    if (this.currentAction) {
+        throw new Error('Cannot call dispatch while another dispatch is executing. Attempted to execute \'' + actionName + '\' but \'' + this.currentAction.name + '\' is already executing.');
+    }
+    var actionHandlers = this.dispatcher.handlers[actionName] || [],
+        defaultHandlers = this.dispatcher.handlers[DEFAULT] || [];
+    if (!actionHandlers.length && !defaultHandlers.length) {
+        debug(actionName + ' does not have any registered handlers');
+        return;
+    }
+    debug('dispatching ' + actionName, payload);
+    this.currentAction = new Action(actionName, payload);
+    var self = this,
+        allHandlers = actionHandlers.concat(defaultHandlers),
+        handlerFns = {};
+
+    try {
+        allHandlers.forEach(function actionHandlersEach(store) {
+            if (handlerFns[store.name]) {
+                // Don't call the default if the store has an explicit action handler
+                return;
+            }
+            var storeInstance = self.getStore(store.name);
+            if ('function' === typeof store.handler) {
+                handlerFns[store.name] = store.handler.bind(storeInstance);
+            } else {
+                if (!storeInstance[store.handler]) {
+                    throw new Error(store.name + ' does not have a method called ' + store.handler);
+                }
+                handlerFns[store.name] = storeInstance[store.handler].bind(storeInstance);
+            }
+        });
+        this.currentAction.execute(handlerFns);
+    } catch (e) {
+        throw e;
+    } finally {
+        debug('finished ' + actionName);
+        this.currentAction = null;
+    }
+};
+
+/**
+ * Returns a raw data object representation of the current state of the
+ * dispatcher and all store instances. If the store implements a shouldDehdyrate
+ * function, then it will be called and only dehydrate if the method returns `true`
+ * @method dehydrate
+ * @returns {Object} dehydrated dispatcher data
+ */
+DispatcherContext.prototype.dehydrate = function dehydrate() {
+    var self = this,
+        stores = {};
+    Object.keys(self.storeInstances).forEach(function storeInstancesEach(storeName) {
+        var store = self.storeInstances[storeName];
+        if (!store.dehydrate || (store.shouldDehydrate && !store.shouldDehydrate())) {
+            return;
+        }
+        stores[storeName] = store.dehydrate();
+    });
+    return {
+        stores: stores
+    };
+};
+
+/**
+ * Takes a raw data object and rehydrates the dispatcher and store instances
+ * @method rehydrate
+ * @param {Object} dispatcherState raw state typically retrieved from `dehydrate`
+ *      method
+ */
+DispatcherContext.prototype.rehydrate = function rehydrate(dispatcherState) {
+    var self = this;
+    if (dispatcherState.stores) {
+        Object.keys(dispatcherState.stores).forEach(function storeStateEach(storeName) {
+            var state = dispatcherState.stores[storeName],
+                store = self.getStore(storeName);
+            if (store.rehydrate) {
+                store.rehydrate(state);
+            }
+        });
+    }
+};
+
+/**
+ * Waits until all stores have finished handling an action and then calls
+ * the callback
+ * @method waitFor
+ * @param {String|String[]} stores An array of stores as strings to wait for
+ * @param {Function} callback Called after all stores have completed handling their actions
+ * @throws {Error} if there is no action dispatching
+ */
+DispatcherContext.prototype.waitFor = function waitFor(stores, callback) {
+    if (!this.currentAction) {
+        throw new Error('waitFor called even though there is no action dispatching');
+    }
+    this.currentAction.waitFor(stores, callback);
+};
+
+module.exports = DispatcherContext;
+
+},{"./Action":11,"debug":8}],14:[function(require,module,exports){
 (function() {
   'use strict';
 
@@ -3615,851 +4394,7 @@ module.exports = exports['default'];
     this.Emitter = Emitter;
 }).call(this);
 
-},{}],9:[function(require,module,exports){
-// shim for using process in browser
-
-var process = module.exports = {};
-
-process.nextTick = (function () {
-    var canSetImmediate = typeof window !== 'undefined'
-    && window.setImmediate;
-    var canPost = typeof window !== 'undefined'
-    && window.postMessage && window.addEventListener
-    ;
-
-    if (canSetImmediate) {
-        return function (f) { return window.setImmediate(f) };
-    }
-
-    if (canPost) {
-        var queue = [];
-        window.addEventListener('message', function (ev) {
-            var source = ev.source;
-            if ((source === window || source === null) && ev.data === 'process-tick') {
-                ev.stopPropagation();
-                if (queue.length > 0) {
-                    var fn = queue.shift();
-                    fn();
-                }
-            }
-        }, true);
-
-        return function nextTick(fn) {
-            queue.push(fn);
-            window.postMessage('process-tick', '*');
-        };
-    }
-
-    return function nextTick(fn) {
-        setTimeout(fn, 0);
-    };
-})();
-
-process.title = 'browser';
-process.browser = true;
-process.env = {};
-process.argv = [];
-
-function noop() {}
-
-process.on = noop;
-process.addListener = noop;
-process.once = noop;
-process.off = noop;
-process.removeListener = noop;
-process.removeAllListeners = noop;
-process.emit = noop;
-
-process.binding = function (name) {
-    throw new Error('process.binding is not supported');
-}
-
-// TODO(shtylman)
-process.cwd = function () { return '/' };
-process.chdir = function (dir) {
-    throw new Error('process.chdir is not supported');
-};
-
-},{}],10:[function(require,module,exports){
-/**
- * Copyright 2014, Yahoo! Inc.
- * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
- */
-module.exports = require('./lib/Dispatcher');
-
-},{"./lib/Dispatcher":12}],11:[function(require,module,exports){
-/**
- * Copyright 2014, Yahoo! Inc.
- * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
- */
-'use strict';
-var debug = require('debug')('Dispatchr:Action');
-
-function Action(name, payload) {
-    this.name = name;
-    this.payload = payload;
-    this._handlers = null;
-    this._isExecuting = false;
-    this._isCompleted = null;
-}
-
-/**
- * Gets a name from a store
- * @method getStoreName
- * @param {String|Object} store The store name or class from which to extract
- *      the name
- * @returns {String}
- */
-Action.prototype.getStoreName = function getStoreName(store) {
-    if ('string' === typeof store) {
-        return store;
-    }
-    return store.storeName;
-};
-
-/**
- * Executes all handlers for the action
- * @method execute
- * @param {Function[]} handlers A mapping of store names to handler function
- * @throws {Error} if action has already been executed
- */
-Action.prototype.execute = function execute(handlers) {
-    if (this._isExecuting) {
-        throw new Error('Action is already dispatched');
-    }
-    var self = this;
-    this._handlers = handlers;
-    this._isExecuting = true;
-    this._isCompleted = {};
-    Object.keys(handlers).forEach(function handlersEach(storeName) {
-        self._callHandler(storeName);
-    });
-};
-
-/**
- * Calls an individual store's handler function
- * @method _callHandler
- * @param {String} storeName
- * @private
- * @throws {Error} if handler does not exist for storeName
- */
-Action.prototype._callHandler = function callHandler(storeName) {
-    var self = this,
-        handlerFn = self._handlers[storeName];
-    if (!handlerFn) {
-        throw new Error(storeName + ' does not have a handler for action ' + self.name);
-    }
-    if (self._isCompleted[storeName]) {
-        return;
-    }
-    self._isCompleted[storeName] = false;
-    debug('executing handler for ' + storeName);
-    handlerFn(self.payload, self.name);
-    self._isCompleted[storeName] = true;
-};
-
-/**
- * Waits until all stores have finished handling an action and then calls
- * the callback
- * @method waitFor
- * @param {String|String[]|Constructor|Constructor[]} stores An array of stores as strings or constructors to wait for
- * @param {Function} callback Called after all stores have completed handling their actions
- * @throws {Error} if the action is not being executed
- */
-Action.prototype.waitFor = function waitFor(stores, callback) {
-    var self = this;
-    if (!self._isExecuting) {
-        throw new Error('waitFor called even though there is no action being executed!');
-    }
-    if (!Array.isArray(stores)) {
-        stores = [stores];
-    }
-
-    debug('waiting on ' + stores.join(', '));
-    stores.forEach(function storesEach(storeName) {
-        storeName = self.getStoreName(storeName);
-        if (self._handlers[storeName]) {
-            self._callHandler(storeName);
-        }
-    });
-
-    callback();
-};
-
-module.exports = Action;
-
-},{"debug":14}],12:[function(require,module,exports){
-(function (process){
-/**
- * Copyright 2014, Yahoo! Inc.
- * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
- */
-'use strict';
-
-var Action = require('./Action');
-var DEFAULT = 'default';
-var DispatcherContext = require('./DispatcherContext');
-
-/**
- * @class Dispatcher
- * @param {Object} options Dispatcher options
- * @param {Array} options.stores Array of stores to register
- * @constructor
- */
-function Dispatcher (options) {
-    options = options || {};
-    options.stores = options.stores || [];
-    this.stores = {};
-    this.handlers = {};
-    this.handlers[DEFAULT] = [];
-    this.hasWarnedAboutNameProperty = false;
-    options.stores.forEach(function (store) {
-        this.registerStore(store);
-    }, this);
-
-}
-
-Dispatcher.prototype.createContext = function createContext(context) {
-    return new DispatcherContext(this, context);
-};
-
-/**
- * Registers a store so that it can handle actions.
- * @method registerStore
- * @static
- * @param {Object} store A store class to be registered. The store should have a static
- *      `name` property so that it can be loaded later.
- * @throws {Error} if store is invalid
- * @throws {Error} if store is already registered
- */
-Dispatcher.prototype.registerStore = function registerStore(store) {
-    if ('function' !== typeof store) {
-        throw new Error('registerStore requires a constructor as first parameter');
-    }
-    var storeName = this.getStoreName(store);
-    if (!storeName) {
-        throw new Error('Store is required to have a `storeName` property.');
-    }
-    if (this.stores[storeName]) {
-        if (this.stores[storeName] === store) {
-            // Store is already registered, nothing to do
-            return;
-        }
-        throw new Error('Store with name `' + storeName + '` has already been registered.');
-    }
-    this.stores[storeName] = store;
-    if (store.handlers) {
-        Object.keys(store.handlers).forEach(function storeHandlersEach(action) {
-            var handler = store.handlers[action];
-            this._registerHandler(action, storeName, handler);
-        }, this);
-    }
-};
-
-/**
- * Method to discover if a storeName has been registered
- * @method isRegistered
- * @static
- * @param {Object|String} store The store to check
- * @returns {boolean}
- */
-Dispatcher.prototype.isRegistered = function isRegistered(store) {
-    var storeName = this.getStoreName(store),
-        storeInstance = this.stores[storeName];
-
-    if (!storeInstance) {
-        return false;
-    }
-
-    if ('function' === typeof store) {
-        if (store !== storeInstance) {
-            return false;
-        }
-    }
-    return true;
-};
-
-/**
- * Gets a name from a store
- * @method getStoreName
- * @static
- * @param {String|Object} store The store name or class from which to extract
- *      the name
- * @returns {String}
- */
-Dispatcher.prototype.getStoreName = function getStoreName(store) {
-    if ('string' === typeof store) {
-        return store;
-    }
-    if (store.storeName) {
-        return store.storeName;
-    }
-
-    if (process.env.NODE_ENV !== 'production') {
-        if (store.name && !this.hasWarnedAboutNameProperty) {
-            console.warn('A store has been registered that relies on the ' +
-                'constructor\'s name property. This name may change when you ' +
-                'minify your stores during build time and could break string ' +
-                'references to your store. It is advised that you add a ' +
-                'static `storeName` property to your store to ensure the ' +
-                'store name does not change during your build.');
-            this.hasWarnedAboutNameProperty = true;
-        }
-    }
-    return store.name;
-};
-
-/**
- * Adds a handler function to be called for the given action
- * @method registerHandler
- * @private
- * @static
- * @param {String} action Name of the action
- * @param {String} name Name of the store that handles the action
- * @param {String|Function} handler The function or name of the method that handles the action
- * @returns {number}
- */
-Dispatcher.prototype._registerHandler = function registerHandler(action, name, handler) {
-    this.handlers[action] = this.handlers[action] || [];
-    this.handlers[action].push({
-        name: this.getStoreName(name),
-        handler: handler
-    });
-    return this.handlers.length - 1;
-};
-
-module.exports = {
-    createDispatcher: function (options) {
-        return new Dispatcher(options);
-    }
-};
-
-}).call(this,require('_process'))
-},{"./Action":11,"./DispatcherContext":13,"_process":9}],13:[function(require,module,exports){
-/**
- * Copyright 2014, Yahoo! Inc.
- * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
- */
-'use strict';
-
-var Action = require('./Action');
-var DEFAULT = 'default';
-var debug = require('debug')('Dispatchr:DispatcherContext');
-
-/**
- * @class Dispatcher
- * @param {Object} context The context to be used for store instances
- * @constructor
- */
-function DispatcherContext (dispatcher, context) {
-    this.dispatcher = dispatcher;
-    this.storeInstances = {};
-    this.currentAction = null;
-    this.dispatcherInterface = {
-        getContext: function getContext() { return context; },
-        getStore: this.getStore.bind(this),
-        waitFor: this.waitFor.bind(this)
-    };
-}
-
-/**
- * Returns a single store instance and creates one if it doesn't already exist
- * @method getStore
- * @param {String} name The name of the instance
- * @returns {Object} The store instance
- * @throws {Error} if store is not registered
- */
-DispatcherContext.prototype.getStore = function getStore(name) {
-    var storeName = this.dispatcher.getStoreName(name);
-    if (!this.storeInstances[storeName]) {
-        var Store = this.dispatcher.stores[storeName];
-        if (!Store) {
-            throw new Error('Store ' + storeName + ' was not registered.');
-        }
-        this.storeInstances[storeName] = new (this.dispatcher.stores[storeName])(this.dispatcherInterface);
-    }
-    return this.storeInstances[storeName];
-};
-
-/**
- * Dispatches a new action or queues it up if one is already in progress
- * @method dispatch
- * @param {String} actionName Name of the action to be dispatched
- * @param {Object} payload Parameters to describe the action
- * @throws {Error} if store has handler registered that does not exist
- */
-DispatcherContext.prototype.dispatch = function dispatch(actionName, payload) {
-    if (!actionName) {
-        throw new Error('actionName parameter `' + actionName + '` is invalid.');
-    }
-    if (this.currentAction) {
-        throw new Error('Cannot call dispatch while another dispatch is executing. Attempted to execute \'' + actionName + '\' but \'' + this.currentAction.name + '\' is already executing.');
-    }
-    var actionHandlers = this.dispatcher.handlers[actionName] || [],
-        defaultHandlers = this.dispatcher.handlers[DEFAULT] || [];
-    if (!actionHandlers.length && !defaultHandlers.length) {
-        debug(actionName + ' does not have any registered handlers');
-        return;
-    }
-    debug('dispatching ' + actionName, payload);
-    this.currentAction = new Action(actionName, payload);
-    var self = this,
-        allHandlers = actionHandlers.concat(defaultHandlers),
-        handlerFns = {};
-
-    try {
-        allHandlers.forEach(function actionHandlersEach(store) {
-            if (handlerFns[store.name]) {
-                // Don't call the default if the store has an explicit action handler
-                return;
-            }
-            var storeInstance = self.getStore(store.name);
-            if ('function' === typeof store.handler) {
-                handlerFns[store.name] = store.handler.bind(storeInstance);
-            } else {
-                if (!storeInstance[store.handler]) {
-                    throw new Error(store.name + ' does not have a method called ' + store.handler);
-                }
-                handlerFns[store.name] = storeInstance[store.handler].bind(storeInstance);
-            }
-        });
-        this.currentAction.execute(handlerFns);
-    } catch (e) {
-        throw e;
-    } finally {
-        debug('finished ' + actionName);
-        this.currentAction = null;
-    }
-};
-
-/**
- * Returns a raw data object representation of the current state of the
- * dispatcher and all store instances. If the store implements a shouldDehdyrate
- * function, then it will be called and only dehydrate if the method returns `true`
- * @method dehydrate
- * @returns {Object} dehydrated dispatcher data
- */
-DispatcherContext.prototype.dehydrate = function dehydrate() {
-    var self = this,
-        stores = {};
-    Object.keys(self.storeInstances).forEach(function storeInstancesEach(storeName) {
-        var store = self.storeInstances[storeName];
-        if (!store.dehydrate || (store.shouldDehydrate && !store.shouldDehydrate())) {
-            return;
-        }
-        stores[storeName] = store.dehydrate();
-    });
-    return {
-        stores: stores
-    };
-};
-
-/**
- * Takes a raw data object and rehydrates the dispatcher and store instances
- * @method rehydrate
- * @param {Object} dispatcherState raw state typically retrieved from `dehydrate`
- *      method
- */
-DispatcherContext.prototype.rehydrate = function rehydrate(dispatcherState) {
-    var self = this;
-    if (dispatcherState.stores) {
-        Object.keys(dispatcherState.stores).forEach(function storeStateEach(storeName) {
-            var state = dispatcherState.stores[storeName],
-                store = self.getStore(storeName);
-            if (store.rehydrate) {
-                store.rehydrate(state);
-            }
-        });
-    }
-};
-
-/**
- * Waits until all stores have finished handling an action and then calls
- * the callback
- * @method waitFor
- * @param {String|String[]} stores An array of stores as strings to wait for
- * @param {Function} callback Called after all stores have completed handling their actions
- * @throws {Error} if there is no action dispatching
- */
-DispatcherContext.prototype.waitFor = function waitFor(stores, callback) {
-    if (!this.currentAction) {
-        throw new Error('waitFor called even though there is no action dispatching');
-    }
-    this.currentAction.waitFor(stores, callback);
-};
-
-module.exports = DispatcherContext;
-
-},{"./Action":11,"debug":14}],14:[function(require,module,exports){
-
-/**
- * This is the web browser implementation of `debug()`.
- *
- * Expose `debug()` as the module.
- */
-
-exports = module.exports = require('./debug');
-exports.log = log;
-exports.formatArgs = formatArgs;
-exports.save = save;
-exports.load = load;
-exports.useColors = useColors;
-exports.storage = 'undefined' != typeof chrome
-               && 'undefined' != typeof chrome.storage
-                  ? chrome.storage.local
-                  : localstorage();
-
-/**
- * Colors.
- */
-
-exports.colors = [
-  'lightseagreen',
-  'forestgreen',
-  'goldenrod',
-  'dodgerblue',
-  'darkorchid',
-  'crimson'
-];
-
-/**
- * Currently only WebKit-based Web Inspectors, Firefox >= v31,
- * and the Firebug extension (any Firefox version) are known
- * to support "%c" CSS customizations.
- *
- * TODO: add a `localStorage` variable to explicitly enable/disable colors
- */
-
-function useColors() {
-  // is webkit? http://stackoverflow.com/a/16459606/376773
-  return ('WebkitAppearance' in document.documentElement.style) ||
-    // is firebug? http://stackoverflow.com/a/398120/376773
-    (window.console && (console.firebug || (console.exception && console.table))) ||
-    // is firefox >= v31?
-    // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
-    (navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31);
-}
-
-/**
- * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
- */
-
-exports.formatters.j = function(v) {
-  return JSON.stringify(v);
-};
-
-
-/**
- * Colorize log arguments if enabled.
- *
- * @api public
- */
-
-function formatArgs() {
-  var args = arguments;
-  var useColors = this.useColors;
-
-  args[0] = (useColors ? '%c' : '')
-    + this.namespace
-    + (useColors ? ' %c' : ' ')
-    + args[0]
-    + (useColors ? '%c ' : ' ')
-    + '+' + exports.humanize(this.diff);
-
-  if (!useColors) return args;
-
-  var c = 'color: ' + this.color;
-  args = [args[0], c, 'color: inherit'].concat(Array.prototype.slice.call(args, 1));
-
-  // the final "%c" is somewhat tricky, because there could be other
-  // arguments passed either before or after the %c, so we need to
-  // figure out the correct index to insert the CSS into
-  var index = 0;
-  var lastC = 0;
-  args[0].replace(/%[a-z%]/g, function(match) {
-    if ('%%' === match) return;
-    index++;
-    if ('%c' === match) {
-      // we only are interested in the *last* %c
-      // (the user may have provided their own)
-      lastC = index;
-    }
-  });
-
-  args.splice(lastC, 0, c);
-  return args;
-}
-
-/**
- * Invokes `console.log()` when available.
- * No-op when `console.log` is not a "function".
- *
- * @api public
- */
-
-function log() {
-  // this hackery is required for IE8/9, where
-  // the `console.log` function doesn't have 'apply'
-  return 'object' === typeof console
-    && console.log
-    && Function.prototype.apply.call(console.log, console, arguments);
-}
-
-/**
- * Save `namespaces`.
- *
- * @param {String} namespaces
- * @api private
- */
-
-function save(namespaces) {
-  try {
-    if (null == namespaces) {
-      exports.storage.removeItem('debug');
-    } else {
-      exports.storage.debug = namespaces;
-    }
-  } catch(e) {}
-}
-
-/**
- * Load `namespaces`.
- *
- * @return {String} returns the previously persisted debug modes
- * @api private
- */
-
-function load() {
-  var r;
-  try {
-    r = exports.storage.debug;
-  } catch(e) {}
-  return r;
-}
-
-/**
- * Enable namespaces listed in `localStorage.debug` initially.
- */
-
-exports.enable(load());
-
-/**
- * Localstorage attempts to return the localstorage.
- *
- * This is necessary because safari throws
- * when a user disables cookies/localstorage
- * and you attempt to access it.
- *
- * @return {LocalStorage}
- * @api private
- */
-
-function localstorage(){
-  try {
-    return window.localStorage;
-  } catch (e) {}
-}
-
-},{"./debug":15}],15:[function(require,module,exports){
-
-/**
- * This is the common logic for both the Node.js and web browser
- * implementations of `debug()`.
- *
- * Expose `debug()` as the module.
- */
-
-exports = module.exports = debug;
-exports.coerce = coerce;
-exports.disable = disable;
-exports.enable = enable;
-exports.enabled = enabled;
-exports.humanize = require('ms');
-
-/**
- * The currently active debug mode names, and names to skip.
- */
-
-exports.names = [];
-exports.skips = [];
-
-/**
- * Map of special "%n" handling functions, for the debug "format" argument.
- *
- * Valid key names are a single, lowercased letter, i.e. "n".
- */
-
-exports.formatters = {};
-
-/**
- * Previously assigned color.
- */
-
-var prevColor = 0;
-
-/**
- * Previous log timestamp.
- */
-
-var prevTime;
-
-/**
- * Select a color.
- *
- * @return {Number}
- * @api private
- */
-
-function selectColor() {
-  return exports.colors[prevColor++ % exports.colors.length];
-}
-
-/**
- * Create a debugger with the given `namespace`.
- *
- * @param {String} namespace
- * @return {Function}
- * @api public
- */
-
-function debug(namespace) {
-
-  // define the `disabled` version
-  function disabled() {
-  }
-  disabled.enabled = false;
-
-  // define the `enabled` version
-  function enabled() {
-
-    var self = enabled;
-
-    // set `diff` timestamp
-    var curr = +new Date();
-    var ms = curr - (prevTime || curr);
-    self.diff = ms;
-    self.prev = prevTime;
-    self.curr = curr;
-    prevTime = curr;
-
-    // add the `color` if not set
-    if (null == self.useColors) self.useColors = exports.useColors();
-    if (null == self.color && self.useColors) self.color = selectColor();
-
-    var args = Array.prototype.slice.call(arguments);
-
-    args[0] = exports.coerce(args[0]);
-
-    if ('string' !== typeof args[0]) {
-      // anything else let's inspect with %o
-      args = ['%o'].concat(args);
-    }
-
-    // apply any `formatters` transformations
-    var index = 0;
-    args[0] = args[0].replace(/%([a-z%])/g, function(match, format) {
-      // if we encounter an escaped % then don't increase the array index
-      if (match === '%%') return match;
-      index++;
-      var formatter = exports.formatters[format];
-      if ('function' === typeof formatter) {
-        var val = args[index];
-        match = formatter.call(self, val);
-
-        // now we need to remove `args[index]` since it's inlined in the `format`
-        args.splice(index, 1);
-        index--;
-      }
-      return match;
-    });
-
-    if ('function' === typeof exports.formatArgs) {
-      args = exports.formatArgs.apply(self, args);
-    }
-    var logFn = enabled.log || exports.log || console.log.bind(console);
-    logFn.apply(self, args);
-  }
-  enabled.enabled = true;
-
-  var fn = exports.enabled(namespace) ? enabled : disabled;
-
-  fn.namespace = namespace;
-
-  return fn;
-}
-
-/**
- * Enables a debug mode by namespaces. This can include modes
- * separated by a colon and wildcards.
- *
- * @param {String} namespaces
- * @api public
- */
-
-function enable(namespaces) {
-  exports.save(namespaces);
-
-  var split = (namespaces || '').split(/[\s,]+/);
-  var len = split.length;
-
-  for (var i = 0; i < len; i++) {
-    if (!split[i]) continue; // ignore empty strings
-    namespaces = split[i].replace(/\*/g, '.*?');
-    if (namespaces[0] === '-') {
-      exports.skips.push(new RegExp('^' + namespaces.substr(1) + '$'));
-    } else {
-      exports.names.push(new RegExp('^' + namespaces + '$'));
-    }
-  }
-}
-
-/**
- * Disable debug output.
- *
- * @api public
- */
-
-function disable() {
-  exports.enable('');
-}
-
-/**
- * Returns true if the given mode name is enabled, false otherwise.
- *
- * @param {String} name
- * @return {Boolean}
- * @api public
- */
-
-function enabled(name) {
-  var i, len;
-  for (i = 0, len = exports.skips.length; i < len; i++) {
-    if (exports.skips[i].test(name)) {
-      return false;
-    }
-  }
-  for (i = 0, len = exports.names.length; i < len; i++) {
-    if (exports.names[i].test(name)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
- * Coerce `val`.
- *
- * @param {Mixed} val
- * @return {Mixed}
- * @api private
- */
-
-function coerce(val) {
-  if (val instanceof Error) return val.stack || val.message;
-  return val;
-}
-
-},{"ms":16}],16:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 /**
  * Helpers.
  */
@@ -4586,6 +4521,71 @@ function plural(ms, n, name) {
   return Math.ceil(ms / n) + ' ' + name + 's';
 }
 
+},{}],16:[function(require,module,exports){
+// shim for using process in browser
+
+var process = module.exports = {};
+
+process.nextTick = (function () {
+    var canSetImmediate = typeof window !== 'undefined'
+    && window.setImmediate;
+    var canPost = typeof window !== 'undefined'
+    && window.postMessage && window.addEventListener
+    ;
+
+    if (canSetImmediate) {
+        return function (f) { return window.setImmediate(f) };
+    }
+
+    if (canPost) {
+        var queue = [];
+        window.addEventListener('message', function (ev) {
+            var source = ev.source;
+            if ((source === window || source === null) && ev.data === 'process-tick') {
+                ev.stopPropagation();
+                if (queue.length > 0) {
+                    var fn = queue.shift();
+                    fn();
+                }
+            }
+        }, true);
+
+        return function nextTick(fn) {
+            queue.push(fn);
+            window.postMessage('process-tick', '*');
+        };
+    }
+
+    return function nextTick(fn) {
+        setTimeout(fn, 0);
+    };
+})();
+
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+
+function noop() {}
+
+process.on = noop;
+process.addListener = noop;
+process.once = noop;
+process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
+process.emit = noop;
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
+}
+
+// TODO(shtylman)
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
+};
+
 },{}],17:[function(require,module,exports){
 (function (global){
 'use strict';
@@ -4607,10 +4607,11 @@ var angular = global.angular || require('angular') && global.angular;
 var angularModule = angular.module;
 var registeredStores = [];
 var autoInjectStores = false;
+var useEvalAsync = true;
 
 // A function that creates stores
 function createStore(name) {
-  var spec = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
+  var spec = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
   var immutableDefaults = arguments[2];
   var flux = arguments[3];
 
@@ -4640,7 +4641,7 @@ function createStore(name) {
 
   // Instantiates immutable state and saves it to private variable that can be used for setting listeners
   Store.prototype.immutable = function (initialState) {
-    var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
+    var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
 
     if (this.__tree) {
       this.__tree.set(initialState);
@@ -4775,6 +4776,10 @@ angular.module('flux', []).provider('flux', function FluxProvider() {
     autoInjectStores = val;
   };
 
+  this.useEvalAsync = function (val) {
+    useEvalAsync = val;
+  };
+
   this.$get = [function fluxFactory() {
     return new FluxService(immutableDefaults);
   }];
@@ -4789,6 +4794,8 @@ angular.module('flux', []).provider('flux', function FluxProvider() {
 
   // Extend scopes with $listenTo
   $rootScope.constructor.prototype.$listenTo = function (storeExport, mapping, callback) {
+    var _this = this;
+
     var cursor = void 0;
     var store = flux.getStore(storeExport);
 
@@ -4801,6 +4808,17 @@ angular.module('flux', []).provider('flux', function FluxProvider() {
       cursor = store.__tree;
     } else {
       cursor = store.__tree.select(mapping);
+    }
+
+    if (useEvalAsync) {
+      (function () {
+        var originalCallback = callback;
+        callback = function callback(e) {
+          _this.$evalAsync(function () {
+            return originalCallback(e);
+          });
+        };
+      })();
     }
 
     cursor.on('update', callback);
