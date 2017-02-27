@@ -1,6 +1,6 @@
 {
   "name": "flux-angular",
-  "version": "3.0.1",
+  "version": "3.1.1",
   "description": "A FLUX architecture for Angular JS",
   "main": "./src/flux-angular.js",
   "scripts": {
@@ -34,7 +34,7 @@
   },
   "dependencies": {
     "angular": "~1.2",
-    "baobab": "^2.3.0",
+    "baobab": "^2.4.2",
     "dispatchr": "^0.3.3"
   }
 }
