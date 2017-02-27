@@ -153,21 +153,16 @@ describe('FLUX-ANGULAR', function() {
           expect($scope.$listenTo).toBeDefined();
         });
 
-        it('should call $evalAsync and then the callback when $listenTo is first attached so that the view-model is initialized', function() {
+        it('should invoke the callback immediately upon setting up the store so that state is available to angular as it is initializing', function() {
           $scope.$listenTo(MyStore, cb);
-          expect($scope.$evalAsync.calls.count()).toEqual(1);
-          expect(cb.calls.count()).toEqual(0);
-          $browser.defer.flush();
-
+          expect($scope.$evalAsync.calls.count()).toEqual(0);
           expect(cb.calls.count()).toEqual(1);
           expect(cb.calls.argsFor(0)[0]).toEqual({});
         });
 
         it('should call $evalAsync and the callback when state is changed on any part of the tree', function() {
           $scope.$listenTo(MyStore, cb);
-          $browser.defer.flush();
           cb.calls.reset();
-          $scope.$evalAsync.calls.reset();
 
           flux.dispatch('addItem', { item: 'foo' });
           expect($scope.$evalAsync.calls.count()).toEqual(1);
@@ -184,9 +179,7 @@ describe('FLUX-ANGULAR', function() {
 
         it('should call the callback if a specific cursor is listened to and changed', function() {
           $scope.$listenTo(MyStore, ['items'], cb);
-          $browser.defer.flush();
           cb.calls.reset();
-          $scope.$evalAsync.calls.reset();
 
           flux.dispatch('addItem', { item: 'foo' });
           expect($scope.$evalAsync.calls.count()).toEqual(1);
@@ -201,9 +194,7 @@ describe('FLUX-ANGULAR', function() {
 
         it('should remove the listener when the scope is destroyed', function() {
           $scope.$listenTo(MyStore, ['items'], cb);
-          $browser.defer.flush();
           cb.calls.reset();
-          $scope.$evalAsync.calls.reset();
 
           // need to keep a ref to evalAsync since it is removed when the scope is destroyed
           const evalAsync = $scope.$evalAsync;
@@ -223,7 +214,6 @@ describe('FLUX-ANGULAR', function() {
           $scope.$listenTo(MyStore, function() {
             cb('MyStore');
           });
-          $browser.defer.flush();
           cb.calls.reset();
 
           flux.dispatch('addItem', { item: 'test' });

@@ -185,7 +185,7 @@ angular.module('flux', [])
 
     // Extend scopes with $listenTo
     $rootScope.constructor.prototype.$listenTo = function (storeExport, mapping, callback) {
-      let cursor;
+      let cursor, originalCallback;
       const store = flux.getStore(storeExport);
 
       if (!store.__tree) {
@@ -199,8 +199,8 @@ angular.module('flux', [])
         cursor = store.__tree.select(mapping);
       }
 
+      originalCallback = callback;
       if (useEvalAsync) {
-        const originalCallback = callback;
         callback = (e) => {
           this.$evalAsync(() => originalCallback(e));
         };
@@ -208,8 +208,10 @@ angular.module('flux', [])
 
       cursor.on('update', callback);
 
-      // Call the callback so that state gets the initial sync with the view-model variables
-      callback({});
+      // Call the callback so that state gets the initial sync with the view-model variables. evalAsync is specifically
+      // not used here because state should be available to angular as it is initializing. Otherwise state can be
+      // undefined while the first digest cycle is running.
+      originalCallback({});
 
       // Remove the listeners on the store when scope is destroyed (GC)
       this.$on('$destroy', () => cursor.off('update', callback));

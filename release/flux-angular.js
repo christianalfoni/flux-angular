@@ -4809,7 +4809,8 @@ angular.module('flux', []).provider('flux', function FluxProvider() {
   $rootScope.constructor.prototype.$listenTo = function (storeExport, mapping, callback) {
     var _this = this;
 
-    var cursor = void 0;
+    var cursor = void 0,
+        originalCallback = void 0;
     var store = flux.getStore(storeExport);
 
     if (!store.__tree) {
@@ -4823,21 +4824,21 @@ angular.module('flux', []).provider('flux', function FluxProvider() {
       cursor = store.__tree.select(mapping);
     }
 
+    originalCallback = callback;
     if (useEvalAsync) {
-      (function () {
-        var originalCallback = callback;
-        callback = function callback(e) {
-          _this.$evalAsync(function () {
-            return originalCallback(e);
-          });
-        };
-      })();
+      callback = function callback(e) {
+        _this.$evalAsync(function () {
+          return originalCallback(e);
+        });
+      };
     }
 
     cursor.on('update', callback);
 
-    // Call the callback so that state gets the initial sync with the view-model variables
-    callback({});
+    // Call the callback so that state gets the initial sync with the view-model variables. evalAsync is specifically
+    // not used here because state should be available to angular as it is initializing. Otherwise state can be
+    // undefined while the first digest cycle is running.
+    originalCallback({});
 
     // Remove the listeners on the store when scope is destroyed (GC)
     this.$on('$destroy', function () {
