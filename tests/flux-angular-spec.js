@@ -1,12 +1,13 @@
 describe('FLUX-ANGULAR', function() {
   describe('.store', function() {
-    let $scope, flux, cb, MyStore, MyStoreB, $browser;
+    let $scope, flux, fluxProvider, cb, MyStore, MyStoreB, $browser;
 
     function initialize (options) {
       options = options || {};
 
       angular.module('test', ['flux'])
-        .config(function (fluxProvider) {
+        .config(function (_fluxProvider_) {
+          fluxProvider = _fluxProvider_;
           fluxProvider.setImmutableDefaults({ asynchronous: false });
           if(angular.isDefined(options.useEvalAsync)) {
             fluxProvider.useEvalAsync(options.useEvalAsync);
@@ -115,7 +116,6 @@ describe('FLUX-ANGULAR', function() {
           $scope.$listenTo(MyStore, cb);
           flux.dispatcher.storeInstances.MyStore.initialize();
           flux.dispatch('addItem', { item: 'foo' });
-          $browser.defer.flush();
           expect(cb.calls.count()).toEqual(3); // once for initialization, once for state reset, and once for addItem
         });
       });
@@ -149,6 +149,10 @@ describe('FLUX-ANGULAR', function() {
       });
 
       describe('event listeners', function() {
+        beforeEach(function() {
+          fluxProvider.useEvalAsync(true); // for to true because default is to turn it off for tests
+        });
+
         it('should have a $listenTo method', function() {
           expect($scope.$listenTo).toBeDefined();
         });
@@ -217,7 +221,6 @@ describe('FLUX-ANGULAR', function() {
           cb.calls.reset();
 
           flux.dispatch('addItem', { item: 'test' });
-          $browser.defer.flush();
           expect(cb.calls.argsFor(0)[0]).toEqual('MyStore');
           expect(cb.calls.argsFor(1)[0]).toEqual('MyStoreB');
         });

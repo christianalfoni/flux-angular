@@ -176,6 +176,8 @@ angular.module('flux', [])
   })
   .run(['$rootScope', '$injector', 'flux', function ($rootScope, $injector, flux) {
     if (angular.mock) {
+      // Forced to false during testing to avoid needing to flush to test $listenTo interaction
+      useEvalAsync = false;
       flux.reset();
     }
 
