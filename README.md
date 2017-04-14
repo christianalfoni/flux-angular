@@ -86,7 +86,7 @@ angular.module('app', ['flux'])
       });
     },
     handlers: {
-      'addComment': 'addComment'
+      'ADD_COMMENT': 'addComment'
     },
     addComment: function (comment) {
       this.state.push('comments', comment);
@@ -122,7 +122,7 @@ angular.module('app', ['flux'])
       });
     },
     handlers: {
-      'savePerson': 'savePerson'
+      'SAVE_PERSON': 'savePerson'
     },
     savePerson: function (payload) {
       this.state.merge('person', payload.person);
@@ -137,27 +137,33 @@ angular.module('app', ['flux'])
     }
   };
 })
-.directive ('myComponent', function () {
-  return {
-    controllerAs: 'myComponent',
-    scope: {},
-    templateUrl: 'myComponent.html',
-    controller: function ($scope, MyStore, flux) {
-      $scope.savePerson = function () {
-        flux.dispatch('savePerson', { person: $scope.person });
-      };
-      $scope.$listenTo(MyStore, setStoreVars);
-      $scope.$listenTo(MyStore, ['person', 'name'], setName);
+.component('myComponent', {
+  templateUrl: 'myComponent.html',
+  controller: function (MyStore, myStoreActions) {
+    var vm = this;
+    vm.savePerson = myStoreActions.savePerson;
+    vm.$listenTo(MyStore, setStoreVars);
+    vm.$listenTo(MyStore, ['person', 'name'], setName);
 
-      function setStoreVars() {
-        $scope.person = MyStore.person;
-      }
-
-      function setName() {
-        $scope.name = MyStore.person.name;
-      }
+    function setStoreVars() {
+      $scope.person = MyStore.person;
     }
+
+    function setName() {
+      $scope.name = MyStore.person.name;
+    }
+  }
+})
+.service('myStoreActions', function(flux) {
+  var service = {
+    savePerson: savePerson
   };
+  
+  return service;
+  
+  function savePerson(person) {
+    flux.dispatch('SAVE_PERSON', { person: person });
+  }
 });
 ```
 By using the `.$listenTo()` method we set up a callback that will be fired
@@ -177,22 +183,14 @@ multiple dispatch calls occur, as shown in the `addComment` method below.
 
 ```javascript
 angular.module('app', ['flux'])
-// When you develop a larger application, especially with lots of async
-// operations it can be a good idea to define your actions as constants. That way
-// it is less likely that a typo becomes confusing.
-.constant('actions', {
-  COMMENT_ADD: 'COMMENT_ADD',
-  COMMENT_ADD_SUCCESS: 'COMMENT_ADD_SUCCESS',
-  COMMENT_ADD_ERROR: 'COMMENT_ADD_ERROR'
-})
-.factory('commentActions', function ($http, flux, actions) {
+.factory('commentActions', function ($http, flux) {
   var service = {
     setTitle: setTitle,
     addComment: addComment
   };
   return service;
 
-  // An exaple of a basic dispatch using a string as an action key and a payload.
+  // An exaple of a basic dispatch with the first argument being the action key and a payload.
   // One or more stores is expected to have a handler for COMMENT_SET_TITLE
   function setTitle(title) {
     flux.dispatch('COMMENT_SET_TITLE', { title: title });
@@ -203,13 +201,13 @@ angular.module('app', ['flux'])
   // method also requires the handlers to be synchronous. You solve this by having
   // async services, also called **action creators** or **API adapters**.
   function addComment(comment) {
-    flux.dispatch(actions.COMMENT_ADD, { comment: comment });
+    flux.dispatch('COMMENT_ADD', { comment: comment });
     $http.post('/comments', comment)
     .then(function () {
-      flux.dispatch(actions.COMMENT_ADD_SUCCESS, { comment: comment });
+      flux.dispatch('COMMENT_ADD_SUCCESS', { comment: comment });
     })
     .catch(function (error) {
-      flux.dispatch(actions.COMMENT_ADD_ERROR, { comment: comment, error: error });
+      flux.dispatch('COMMENT_ADD_ERROR', { comment: comment, error: error });
     });
   }
 });
@@ -229,7 +227,7 @@ angular.module('app', ['flux'])
       this.state = this.immutable({ comments: [] });
     },
     handlers: {
-      'addComment': 'addComment'
+      'ADD_COMMENT': 'addComment'
     },
     addComment: function (comment) {
       this.waitFor('NotificationStore', function () {
@@ -247,7 +245,7 @@ angular.module('app', ['flux'])
       this.state = this.immutable({ notifications: [] });
     },
     handlers: {
-      'addComment': 'addNotification'
+      'ADD_COMMENT': 'addNotification'
     },
     addNotification: function (comment) {
       this.state.push('notifications', 'Something happened');
@@ -269,12 +267,12 @@ describe('adding items', function () {
   beforeEach(module('app'));
 
   it('it should add strings dispatched to addItem', inject(function (MyStore, flux) {
-    flux.dispatch('addItem', 'foo')
+    flux.dispatch('ADD_ITEM', 'foo')
     expect(MyStore.getItems()).toEqual(['foo']);
   }));
 
   it('it should add number dispatched to addItem', inject(function (MyStore, flux) {
-    flux.dispatch('addItem', 1)
+    flux.dispatch('ADD_ITEM', 1)
     expect(MyStore.getItems()).toEqual([1]);
   }));
 });
