@@ -86,7 +86,7 @@ angular.module('app', ['flux'])
       });
     },
     handlers: {
-      'ADD_COMMENT': 'addComment'
+      ADD_COMMENT: 'addComment'
     },
     addComment: function (comment) {
       this.state.push('comments', comment);
@@ -122,7 +122,7 @@ angular.module('app', ['flux'])
       });
     },
     handlers: {
-      'SAVE_PERSON': 'savePerson'
+      SAVE_PERSON: 'savePerson'
     },
     savePerson: function (payload) {
       this.state.merge('person', payload.person);
@@ -227,7 +227,7 @@ angular.module('app', ['flux'])
       this.state = this.immutable({ comments: [] });
     },
     handlers: {
-      'ADD_COMMENT': 'addComment'
+      ADD_COMMENT: 'addComment'
     },
     addComment: function (comment) {
       this.waitFor('NotificationStore', function () {
@@ -245,7 +245,7 @@ angular.module('app', ['flux'])
       this.state = this.immutable({ notifications: [] });
     },
     handlers: {
-      'ADD_COMMENT': 'addNotification'
+      ADD_COMMENT: 'addNotification'
     },
     addNotification: function (comment) {
       this.state.push('notifications', 'Something happened');
