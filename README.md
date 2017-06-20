@@ -1,5 +1,3 @@
-[![Gitter](https://badges.gitter.im/Join Chat.svg)](https://gitter.im/christianalfoni/flux-angular?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-
 # flux-angular
 **flux-angular** makes it easy to implement a performant, scalable, and clean
 [flux application architecture](https://facebook.github.io/flux/docs/overview.html) in an angular
