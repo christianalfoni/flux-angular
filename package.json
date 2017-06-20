@@ -1,8 +1,8 @@
 {
   "name": "flux-angular",
-  "version": "3.1.4",
+  "version": "3.1.5",
   "description": "A FLUX architecture for Angular JS",
-  "main": "./src/flux-angular.js",
+  "main": "./dist/flux-angular.js",
   "scripts": {
     "build": "mkdirp build && browserify ./src/flux-angular.js -t [ babelify --presets [ es2015 ] ] -o ./build/flux-angular.js -x angular",
     "deploy": "npm run lint && browserify ./src/flux-angular.js -t [ babelify --presets [ es2015 ] ] -o ./release/flux-angular.js -x angular && uglifyjs ./release/flux-angular.js -c -m -o ./release/flux-angular.min.js",
@@ -33,7 +33,7 @@
     "uglify-js": "^2.6.1"
   },
   "dependencies": {
-    "angular": "~1.2",
+    "angular": "~1.6",
     "baobab": "^2.4.3",
     "dispatchr": "^0.3.3"
   }
