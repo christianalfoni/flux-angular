@@ -1,3 +1,7 @@
+const angular = require('angular');
+require('angular-mocks');
+require('../src/flux-angular');
+
 describe('FLUX-ANGULAR', function() {
   describe('.store', function() {
     let $scope, flux, fluxProvider, cb, MyStore, MyStoreB, $browser;
@@ -82,7 +86,7 @@ describe('FLUX-ANGULAR', function() {
           };
         });
 
-      module('test');
+      angular.mock.module('test');
     }
 
     describe('with default fluxProvider options', function () {

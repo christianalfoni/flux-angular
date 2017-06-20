@@ -15,6 +15,12 @@ The `flux` service is exposed for dispatching actions using the [Yahoo Dispatchr
 - [FAQ](#faq)
 - [Run project](#run-project)
 
+## Installation
+
+Use npm to install and then `require('flux-angular')` in your application.
+```
+npm install --save flux-angular
+```
 
 ## Create a store
 
@@ -314,7 +320,6 @@ versions.
 
 ### Run project
 1. `npm install`
-2. `bower install`
 3. `npm test` and open browser at `http://localhost:9876/`
 
 License
