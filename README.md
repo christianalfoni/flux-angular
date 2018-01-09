@@ -3,7 +3,7 @@
 [flux application architecture](https://facebook.github.io/flux/docs/overview.html) in an angular
 application.  It does this by providing access to a new `angular.store` method
 for holding immutable application state using [Baobab](https://github.com/Yomguithereal/baobab).
-The `flux` service is exposed for dispatching actions using the [Yahoo Dispatchr](https://github.com/yahoo/dispatchr).
+The `flux` service is exposed for dispatching actions using the [Yahoo Dispatchr](https://github.com/yahoo/fluxible/tree/master/packages/dispatchr).
 `$scope.$listenTo` is exposed as a way to respond to changes in a store and sync them with the view-model.
 
 - [Releases](https://github.com/christianalfoni/flux-angular/releases)
