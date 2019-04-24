@@ -5,9 +5,7 @@ import angular from 'angular';
 var angularModule = angular.module;
 var registeredStores = [];
 var autoInjectStores = false;
-var useEvalAsync = true;
-var map = new Map();
-map.set(angular, true); // A function that creates stores
+var useEvalAsync = true; // A function that creates stores
 
 function createStore(name, spec, immutableDefaults, flux) {
   if (spec === void 0) {
@@ -226,5 +224,7 @@ angular.module('flux', []).provider('flux', function FluxProvider() {
     });
   };
 }]);
-module.exports = 'flux';
+var fluxAngular = 'flux';
+
+export default fluxAngular;
 //# sourceMappingURL=flux-angular.esm.js.map

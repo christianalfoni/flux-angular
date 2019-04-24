@@ -251,4 +251,4 @@ angular
     },
   ])
 
-module.exports = 'flux'
+export default 'flux'
