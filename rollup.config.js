@@ -13,7 +13,7 @@ export default [
       globals: {
         angular: 'angular',
       },
-      file: pkg.browser,
+      file: pkg.unpkg,
       format: 'umd',
       name: 'fluxAngular',
       sourcemap: true,

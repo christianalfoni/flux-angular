@@ -3,8 +3,9 @@
   "version": "4.0.0",
   "description": "A FLUX architecture for Angular JS",
   "main": "dist/flux-angular.cjs.js",
+  "main:umd": "dist/flux-angular.umd.js",
   "module": "dist/flux-angular.esm.js",
-  "browser": "dist/flux-angular.umd.js",
+  "unpkg": "dist/flux-angular.umd.js",
   "browserslist": "defaults",
   "scripts": {
     "bootstrap": "npm ci",
