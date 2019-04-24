@@ -1,6 +1,9 @@
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Project dependencies
 node_modules
+
 .DS_Store
-build
-todomvc
-index.html
-bower_components

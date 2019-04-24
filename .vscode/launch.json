@@ -1,0 +1,19 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "chrome",
+      "request": "launch",
+      "preLaunchTask": "npm: karma",
+      "name": "Launch Chrome Karma Debugging",
+      "url": "http://localhost:9876/debug.html",
+      "pathMapping": {
+        "/base/tests": "${workspaceFolder}"
+      },
+      "port": 61456
+    }
+  ]
+}
