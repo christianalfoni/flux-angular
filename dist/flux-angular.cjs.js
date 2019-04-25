@@ -64,7 +64,7 @@ function createStore(name, spec, immutableDefaults, flux) {
 } // Flux Service is a wrapper for the Yahoo Dispatchr
 
 
-var FluxService = function FluxService(immutableDefaults) {
+var FluxService = function FluxService(immutableDefaults, $rootScope) {
   this.stores = [];
   this.dispatcherInstance = dispatchr.createDispatcher();
   this.dispatcher = this.dispatcherInstance.createContext();
@@ -111,6 +111,10 @@ var FluxService = function FluxService(immutableDefaults) {
       }
     });
     return store.exports;
+  };
+
+  this.listenTo = function (storeExport, mapping, callback) {
+    return listenToStore($rootScope, this, storeExport, mapping, callback);
   };
 
   this.getStore = function (storeExport) {
@@ -175,8 +179,8 @@ angular.module('flux', []).provider('flux', function FluxProvider() {
     useEvalAsync = val;
   };
 
-  this.$get = [function fluxFactory() {
-    return new FluxService(immutableDefaults);
+  this.$get = ['$rootScope', function ($rootScope) {
+    return new FluxService(immutableDefaults, $rootScope);
   }];
 }).run(['$rootScope', '$injector', 'flux', function ($rootScope, $injector, flux) {
   if (angular.mock) {
@@ -191,43 +195,51 @@ angular.module('flux', []).provider('flux', function FluxProvider() {
 
 
   $rootScope.constructor.prototype.$listenTo = function (storeExport, mapping, callback) {
-    var _this = this;
-
-    var cursor, originalCallback;
-    var store = flux.getStore(storeExport);
-
-    if (!store.__tree) {
-      throw new Error('Store ' + storeExport.storeName + ' has not defined state with this.immutable() which is required in order to use $listenTo');
-    }
+    var unsubscribe = listenToStore(this, flux, storeExport, mapping, callback);
 
     if (!callback) {
       callback = mapping;
-      cursor = store.__tree;
-    } else {
-      cursor = store.__tree.select(mapping);
-    }
-
-    originalCallback = callback;
-
-    if (useEvalAsync) {
-      callback = function callback(e) {
-        _this.$evalAsync(function () {
-          return originalCallback(e);
-        });
-      };
-    }
-
-    cursor.on('update', callback); // Call the callback so that state gets the initial sync with the view-model variables. evalAsync is specifically
+    } // Call the callback so that state gets the initial sync with the view-model variables. evalAsync is specifically
     // not used here because state should be available to angular as it is initializing. Otherwise state can be
     // undefined while the first digest cycle is running.
 
-    originalCallback({}); // Remove the listeners on the store when scope is destroyed (GC)
 
-    this.$on('$destroy', function () {
-      return cursor.off('update', callback);
-    });
+    callback({}); // Remove the listeners on the store when scope is destroyed (GC)
+
+    this.$on('$destroy', unsubscribe);
   };
 }]);
+
+function listenToStore($scope, flux, storeExport, mapping, callback) {
+  var cursor, originalCallback;
+  var store = flux.getStore(storeExport);
+
+  if (!store.__tree) {
+    throw new Error('Store ' + storeExport.storeName + ' has not defined state with this.immutable() which is required in order to use $listenTo');
+  }
+
+  if (!callback) {
+    callback = mapping;
+    mapping = undefined;
+  }
+
+  cursor = mapping ? store.__tree.select(mapping) : store.__tree;
+  originalCallback = callback;
+
+  if (useEvalAsync) {
+    callback = function callback(e) {
+      $scope.$evalAsync(function () {
+        return originalCallback(e);
+      });
+    };
+  }
+
+  cursor.on('update', callback);
+  return function () {
+    return cursor.off('update', callback);
+  };
+}
+
 var fluxAngular = 'flux';
 
 module.exports = fluxAngular;

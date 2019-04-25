@@ -2,5 +2,8 @@
   "root": true,
   "extends": ["standard", "prettier", "prettier/standard"],
   "plugins": ["prettier", "standard"],
+  "rules": {
+    "standard/no-callback-literal": "off"
+  },
   "parser": "babel-eslint"
 }

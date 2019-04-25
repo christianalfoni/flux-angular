@@ -6,8 +6,5 @@
   "globals": {
     "inject": false
   },
-  "rules": {
-    "standard/no-callback-literal": "off"
-  },
   "extends": ["plugin:jasmine/recommended"]
 }
