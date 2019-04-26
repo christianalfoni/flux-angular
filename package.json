@@ -1,6 +1,6 @@
 {
   "name": "flux-angular",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "A FLUX architecture for Angular JS",
   "main": "dist/flux-angular.cjs.js",
   "main:umd": "dist/flux-angular.umd.js",
