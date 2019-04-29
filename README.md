@@ -188,6 +188,12 @@ Thus, when we dispatch the updated values and merge them into the immutable
 object the callback is triggered and our scope properties can be synced with
 the store.
 
+When using `.$listenTo()`, the listener will be cleaned up when the scope of
+the controller is destroyed. If you'd prefer to manage clean up of the event
+listener, the `flux.listenTo()` method returns a callback that will unsubscribe
+from the event listener. Unlike `.$listenTo()`, `flux.listenTo()` will not call
+the callback as part of setting up the listener.
+
 ### Dispatch actions
 
 It can be helpful to create a service for dispatching actions related to a
