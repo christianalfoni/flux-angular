@@ -4,7 +4,7 @@ require('../src/flux-angular')
 
 describe('FLUX-ANGULAR', function() {
   describe('.store', function() {
-    let $scope, flux, fluxProvider, cb, MyStore, MyStoreB, $browser
+    let $scope, $rootScope, flux, fluxProvider, cb, MyStore, MyStoreB, $browser
 
     function initialize(options) {
       options = options || {}
@@ -96,12 +96,13 @@ describe('FLUX-ANGULAR', function() {
       })
 
       beforeEach(inject(function(
-        $rootScope,
+        _$rootScope_,
         _MyStore_,
         _MyStoreB_,
         _flux_,
         _$browser_
       ) {
+        $rootScope = _$rootScope_
         MyStore = _MyStore_
         MyStoreB = _MyStoreB_
         flux = _flux_
@@ -164,9 +165,9 @@ describe('FLUX-ANGULAR', function() {
         })
       })
 
-      describe('event listeners', function() {
+      describe('scope event listeners', function() {
         beforeEach(function() {
-          fluxProvider.useEvalAsync(true) // for to true because default is to turn it off for tests
+          fluxProvider.useEvalAsync(true) // set to true because default is to turn it off for tests
         })
 
         it('should have a $listenTo method', function() {
@@ -228,6 +229,68 @@ describe('FLUX-ANGULAR', function() {
           flux.dispatch('addItem', { item: 'foo' })
 
           expect(evalAsync.calls.count()).toEqual(0)
+          expect(cb.calls.count()).toEqual(0)
+        })
+      })
+
+      describe('flux event listeners', function() {
+        beforeEach(function() {
+          fluxProvider.useEvalAsync(true) // set to true because default is to turn it off for tests
+        })
+
+        it('should have a listenTo method', function() {
+          expect(flux.listenTo).toBeDefined()
+        })
+
+        it('should NOT invoke the callback immediately upon setting up the listener', function() {
+          flux.listenTo(MyStore, cb)
+
+          expect($rootScope.$evalAsync.calls.count()).toEqual(0)
+          expect(cb.calls.count()).toEqual(0)
+        })
+
+        it('should call $evalAsync with the callback when state is changed on any part of the tree', function() {
+          flux.listenTo(MyStore, cb)
+
+          flux.dispatch('addItem', { item: 'foo' })
+
+          expect($rootScope.$evalAsync.calls.count()).toEqual(1)
+          expect(cb.calls.count()).toEqual(0)
+          $browser.defer.flush()
+
+          expect(cb.calls.count()).toEqual(1)
+          flux.dispatch('setName', { name: 'bar' })
+
+          expect($rootScope.$evalAsync.calls.count()).toEqual(2)
+          $browser.defer.flush()
+
+          expect(cb.calls.count()).toEqual(2)
+        })
+
+        it('should call the callback when a specific cursor is listened to and changed', function() {
+          flux.listenTo(MyStore, ['items'], cb)
+
+          flux.dispatch('addItem', { item: 'foo' })
+
+          expect($rootScope.$evalAsync.calls.count()).toEqual(1)
+          $browser.defer.flush()
+
+          expect(cb.calls.count()).toEqual(1)
+
+          flux.dispatch('setName', { name: 'bar' })
+
+          expect($rootScope.$evalAsync.calls.count()).toEqual(1)
+          expect(cb.calls.count()).toEqual(1)
+        })
+
+        it('should remove the listener when the returned callback is called', function() {
+          const unsubscribe = flux.listenTo(MyStore, ['items'], cb)
+
+          unsubscribe()
+
+          flux.dispatch('addItem', { item: 'foo' })
+
+          expect($rootScope.$evalAsync.calls.count()).toEqual(0)
           expect(cb.calls.count()).toEqual(0)
         })
       })

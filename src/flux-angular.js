@@ -65,7 +65,7 @@ function createStore(name, spec = {}, immutableDefaults, flux) {
 }
 
 // Flux Service is a wrapper for the Yahoo Dispatchr
-const FluxService = function(immutableDefaults) {
+const FluxService = function(immutableDefaults, $rootScope) {
   this.stores = []
   this.dispatcherInstance = dispatchr.createDispatcher()
   this.dispatcher = this.dispatcherInstance.createContext()
@@ -118,6 +118,10 @@ const FluxService = function(immutableDefaults) {
     })
 
     return store.exports
+  }
+
+  this.listenTo = function(storeExport, mapping, callback) {
+    return listenToStore($rootScope, this, storeExport, mapping, callback)
   }
 
   this.getStore = function(storeExport) {
@@ -187,9 +191,8 @@ angular
     }
 
     this.$get = [
-      function fluxFactory() {
-        return new FluxService(immutableDefaults)
-      },
+      '$rootScope',
+      $rootScope => new FluxService(immutableDefaults, $rootScope),
     ]
   })
   .run([
@@ -213,42 +216,58 @@ angular
         mapping,
         callback
       ) {
-        let cursor, originalCallback
-        const store = flux.getStore(storeExport)
-
-        if (!store.__tree) {
-          throw new Error(
-            'Store ' +
-              storeExport.storeName +
-              ' has not defined state with this.immutable() which is required in order to use $listenTo'
-          )
-        }
+        const unsubscribe = listenToStore(
+          this,
+          flux,
+          storeExport,
+          mapping,
+          callback
+        )
 
         if (!callback) {
           callback = mapping
-          cursor = store.__tree
-        } else {
-          cursor = store.__tree.select(mapping)
         }
-
-        originalCallback = callback
-        if (useEvalAsync) {
-          callback = e => {
-            this.$evalAsync(() => originalCallback(e))
-          }
-        }
-
-        cursor.on('update', callback)
 
         // Call the callback so that state gets the initial sync with the view-model variables. evalAsync is specifically
         // not used here because state should be available to angular as it is initializing. Otherwise state can be
         // undefined while the first digest cycle is running.
-        originalCallback({})
+        callback({})
 
         // Remove the listeners on the store when scope is destroyed (GC)
-        this.$on('$destroy', () => cursor.off('update', callback))
+        this.$on('$destroy', unsubscribe)
       }
     },
   ])
+
+function listenToStore($scope, flux, storeExport, mapping, callback) {
+  let cursor, originalCallback
+  const store = flux.getStore(storeExport)
+
+  if (!store.__tree) {
+    throw new Error(
+      'Store ' +
+        storeExport.storeName +
+        ' has not defined state with this.immutable() which is required in order to use $listenTo'
+    )
+  }
+
+  if (!callback) {
+    callback = mapping
+    mapping = undefined
+  }
+
+  cursor = mapping ? store.__tree.select(mapping) : store.__tree
+
+  originalCallback = callback
+  if (useEvalAsync) {
+    callback = e => {
+      $scope.$evalAsync(() => originalCallback(e))
+    }
+  }
+
+  cursor.on('update', callback)
+
+  return () => cursor.off('update', callback)
+}
 
 export default 'flux'
